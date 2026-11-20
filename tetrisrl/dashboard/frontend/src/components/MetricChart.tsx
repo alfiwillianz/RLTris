@@ -42,28 +42,34 @@ export default function MetricChart({ series, height = 320 }: MetricChartProps) 
     <div className="chart-wrap">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 8, right: 18, bottom: 4, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
+          <CartesianGrid strokeDasharray="2 4" stroke="#1e222d" vertical={false} />
           <XAxis
             dataKey="timestep"
             tickFormatter={(value: number) => formatTimesteps(value)}
-            stroke="#8b949e"
-            tick={{ fill: "#8b949e", fontSize: 11 }}
+            stroke="#2c3240"
+            tick={{ fill: "#7c8496", fontSize: 11, fontFamily: "var(--mono)" }}
             minTickGap={30}
           />
           <YAxis
-            stroke="#8b949e"
-            tick={{ fill: "#8b949e", fontSize: 11 }}
+            stroke="#2c3240"
+            tick={{ fill: "#7c8496", fontSize: 11, fontFamily: "var(--mono)" }}
             tickFormatter={(value: number) => formatMetric(value, 2)}
             width={62}
           />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8 }}
-            labelStyle={{ color: "#c9d1d9" }}
-            itemStyle={{ color: "#c9d1d9" }}
-            labelFormatter={(value) => `timestep ${formatTimesteps(Number(value))}`}
+            contentStyle={{
+              background: "#111318",
+              border: "1px solid #2c3240",
+              borderRadius: 4,
+              fontFamily: "var(--mono)",
+              fontSize: 12,
+            }}
+            labelStyle={{ color: "#edf0f5", marginBottom: 4 }}
+            itemStyle={{ color: "#cbd5e1", padding: "1px 0" }}
+            labelFormatter={(value) => `step ${formatTimesteps(Number(value))}`}
             formatter={(value: number | string, name: string) => [formatMetric(Number(value), 4), name]}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: "#8b949e" }} />
+          <Legend wrapperStyle={{ fontSize: 11, fontFamily: "var(--mono)", color: "#7c8496" }} />
           {series.map((item, index) => (
             <Line
               key={item.key}

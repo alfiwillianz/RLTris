@@ -55,14 +55,14 @@ export function metricLabel(metric: string): string {
 }
 
 export const METRIC_COLORS = [
-  "#58a6ff",
-  "#7ee787",
-  "#ffa657",
-  "#d2a8ff",
-  "#ff7b72",
-  "#79c0ff",
-  "#56d364",
-  "#f2cc60",
-  "#ff9bce",
-  "#39c5cf",
+  "#22d3ee",
+  "#f59e0b",
+  "#10b981",
+  "#a78bfa",
+  "#f43f5e",
+  "#38bdf8",
+  "#fb923c",
+  "#e879f9",
+  "#84cc16",
+  "#94a3b8",
 ];

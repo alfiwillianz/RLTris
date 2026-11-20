@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useAsync } from "../hooks";
-import Board from "../components/Board";
+import Board, { MiniPiece } from "../components/Board";
 import { AsyncState } from "../components/Panels";
 import { formatNumber, winnerLabel } from "../lib/format";
 import type { Replay, ReplayPlayerStats, ReplaySnapshot, ReplayTickSide } from "../types";
@@ -66,18 +66,18 @@ function QueuePanel({ snapshot }: { snapshot: ReplaySnapshot | null }) {
   return (
     <div className="queue-row">
       <div className="queue-block">
-        <span className="muted tiny">hold</span>
-        <span className="queue-piece">{snapshot.hold ?? "—"}</span>
+        <span className="muted tiny mono">HOLD</span>
+        <MiniPiece name={snapshot.hold} size={6} />
       </div>
       <div className="queue-block">
-        <span className="muted tiny">next</span>
-        <span className="queue-pieces">
-          {snapshot.next.length ? snapshot.next.join(" ") : "—"}
-        </span>
-      </div>
-      <div className="queue-block">
-        <span className="muted tiny">current</span>
-        <span className="queue-piece">{snapshot.current?.name ?? "—"}</span>
+        <span className="muted tiny mono">NEXT</span>
+        <div className="queue-next-list">
+          {snapshot.next.length ? (
+            snapshot.next.slice(0, 5).map((name, idx) => <MiniPiece key={`${idx}-${name}`} name={name} size={5} />)
+          ) : (
+            <span className="mini-piece-empty">—</span>
+          )}
+        </div>
       </div>
     </div>
   );

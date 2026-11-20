@@ -975,3 +975,311 @@ label.check input {
   color: #f87171;
 }
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.78rem; }
+
+/* ============================================================
+   UI overhaul: cards, motion, run builder
+   ============================================================ */
+:root {
+  --accent: #58a6ff;
+  --accent-2: #7ee787;
+  --danger: #f85149;
+  --panel-glow: rgba(88, 166, 255, 0.18);
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+@keyframes pop-in {
+  0% { transform: scale(0.96); opacity: 0.4; }
+  70% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes slide-gradient {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
+}
+
+main section {
+  animation: fade-up 0.35s ease both;
+}
+.panel {
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.panel:hover {
+  border-color: #3b4757;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+.btn {
+  transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.btn-primary {
+  background: linear-gradient(120deg, #1f6feb, #388bfd 60%, #58a6ff);
+  background-size: 160% 100%;
+  box-shadow: 0 4px 18px rgba(56, 139, 253, 0.28);
+}
+.btn-primary:hover:not(:disabled) {
+  background-position: 100% 0;
+  box-shadow: 0 6px 24px rgba(56, 139, 253, 0.4);
+}
+.btn-block {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+.status {
+  animation: pop-in 0.25s ease both;
+}
+.status-running::before,
+.status-starting::before {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  background:
+    radial-gradient(1200px 120px at 10% 0%, rgba(88, 166, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, #161b22, #12171e);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #58a6ff, #7ee787, transparent);
+  background-size: 200% 100%;
+  animation: slide-gradient 6s linear infinite;
+}
+.hero-badge {
+  align-self: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #30475f;
+  background: rgba(88, 166, 255, 0.1);
+  color: #9ecbff;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.run-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .run-layout { grid-template-columns: 1fr; }
+}
+.run-main { display: flex; flex-direction: column; gap: 1rem; }
+.run-side { position: sticky; top: 1rem; }
+.step-card { animation: fade-up 0.4s ease both; }
+.step-card:nth-child(2) { animation-delay: 0.05s; }
+.step-card:nth-child(3) { animation-delay: 0.1s; }
+.step-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.step-heading h2 { margin: 0; font-size: 1.02rem; }
+.step-index {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f6feb, #58a6ff);
+  color: #0d1117;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.12);
+}
+.selection-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #9ecbff;
+  border: 1px solid #30475f;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+.opponent-section-label {
+  margin: 0.9rem 0 0.5rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b949e;
+}
+.opponent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 0.55rem;
+}
+.opponent-card {
+  position: relative;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  text-align: left;
+  padding: 0.7rem;
+  border-radius: 11px;
+  border: 1px solid #30363d;
+  background: linear-gradient(180deg, #171d25, #141a21);
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.opponent-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #3d5266;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+}
+.opponent-card.selected {
+  border-color: #58a6ff;
+  background: linear-gradient(180deg, rgba(31, 111, 235, 0.16), rgba(22, 27, 34, 0.9));
+  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.45), 0 8px 26px rgba(31, 111, 235, 0.18);
+  animation: pop-in 0.18s ease;
+}
+.opponent-card.unavailable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.opponent-icon {
+  flex: 0 0 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #1c2430;
+  border: 1px solid #2c3948;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #9ecbff;
+}
+.opponent-body { display: flex; flex-direction: column; gap: 0.18rem; min-width: 0; }
+.opponent-name { font-size: 0.86rem; font-weight: 600; }
+.opponent-blurb { font-size: 0.72rem; color: #8b949e; line-height: 1.3; }
+.opponent-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.15rem; }
+.speed, .tag {
+  font-size: 0.66rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid #2c3948;
+  color: #9aa7b5;
+}
+.speed-fast { color: #7ee787; border-color: rgba(126, 231, 135, 0.35); }
+.speed-mid { color: #e3b341; border-color: rgba(227, 179, 65, 0.35); }
+.speed-slow { color: #f0883e; border-color: rgba(240, 136, 62, 0.35); }
+.tag-warn { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
+.opponent-check {
+  margin-left: auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: #0d1117;
+  background: transparent;
+  border: 1px solid #30363d;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.opponent-card.selected .opponent-check {
+  background: #58a6ff;
+  border-color: #58a6ff;
+}
+.warning-banner {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 9px;
+  border: 1px solid rgba(240, 136, 62, 0.4);
+  background: rgba(240, 136, 62, 0.08);
+  color: #ffd8b0;
+  font-size: 0.78rem;
+  animation: fade-up 0.25s ease both;
+}
+.empty-note {
+  padding: 0.7rem;
+  border: 1px dashed #30363d;
+  border-radius: 9px;
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+.estimate-card { position: relative; overflow: hidden; }
+.estimate-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0.6rem 0 0.4rem;
+  animation: pop-in 0.3s ease both;
+}
+.estimate-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(100deg, #9ecbff, #7ee787);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.estimate-label { font-size: 0.72rem; color: #8b949e; }
+.estimate-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: #0d1117;
+  border: 1px solid #232b35;
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+}
+.estimate-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1f6feb, #58a6ff, #7ee787);
+  background-size: 200% 100%;
+  animation: shimmer 2.4s linear infinite;
+  transition: width 0.45s ease;
+}
+.estimate-kv { gap: 0.5rem 0.8rem; }
+.estimate-opponents { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.7rem 0 0.2rem; }
+.mini-chip {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: #1c2129;
+  border: 1px solid #30363d;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

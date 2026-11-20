@@ -1,15 +1,82 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAsync } from "../hooks";
 
-const TRAINING_OPPONENTS = [
-  { id: "none", label: "Solo / survival (no opponent)" },
-  { id: "random", label: "Random legal placements" },
-  { id: "heuristic", label: "Handcrafted heuristic" },
-  { id: "search", label: "Beam search (multi-ply)" },
-  { id: "variant", label: "Seeded variants (mixed weights/search)" },
+interface OpponentMeta {
+  id: string;
+  label: string;
+  group: "solo" | "baseline" | "external";
+  msPerMove: number;
+  blurb: string;
+  icon: string;
+  tag?: string;
+}
+
+const BASE_OPPONENTS: OpponentMeta[] = [
+  {
+    id: "none",
+    label: "Solo / survival",
+    group: "solo",
+    msPerMove: 0,
+    blurb: "No opponent; the agent learns board management and survival pressure only.",
+    icon: "◎",
+    tag: "no attacks",
+  },
+  {
+    id: "random",
+    label: "Random placements",
+    group: "baseline",
+    msPerMove: 0.1,
+    blurb: "Uniform legal placements. Fast and erratic; useful for early curriculum.",
+    icon: "R",
+  },
+  {
+    id: "heuristic",
+    label: "Handcrafted heuristic",
+    group: "baseline",
+    msPerMove: 6,
+    blurb: "Dellacherie-style one-ply evaluation with competitive terms.",
+    icon: "H",
+    tag: "consistent",
+  },
+  {
+    id: "search",
+    label: "Beam search",
+    group: "baseline",
+    msPerMove: 80,
+    blurb: "Multi-ply beam search over placements; the strongest in-repo baseline.",
+    icon: "B",
+    tag: "slow",
+  },
+  {
+    id: "variant",
+    label: "Seeded variants",
+    group: "baseline",
+    msPerMove: 35,
+    blurb: "Jittered heuristic weights, evaluation noise and randomised search per episode.",
+    icon: "V",
+    tag: "anti-overfit",
+  },
 ];
+
+const EXTERNAL_META: Record<string, { msPerMove: number; blurb: string; icon: string; tag?: string }> = {
+  coldclear: { msPerMove: 62, blurb: "TBP placement oracle, strongest verified external engine.", icon: "CC" },
+  riku: { msPerMove: 5, blurb: "Fast zero-dependency TBP beam search.", icon: "RI", tag: "fast" },
+  coldclear1: { msPerMove: 42, blurb: "C ABI engine that receives pending garbage counts.", icon: "C1", tag: "garbage-aware" },
+  nana: { msPerMove: 150, blurb: "Parallel MCTS with an opponent model and garbage meter.", icon: "NA", tag: "garbage-aware" },
+  hikari: { msPerMove: 20, blurb: "TBP engine with a 24-row board view.", icon: "HK" },
+  blockfish: { msPerMove: 45, blurb: "Cheese/downstack specialist — not a versus benchmark.", icon: "BF", tag: "specialist" },
+  frostetra: { msPerMove: 300, blurb: "SBP engine claiming SRS+/180; slow search.", icon: "FR", tag: "SRS+" },
+};
+
+function humanize(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const hours = seconds / 3600;
+  return hours < 10 ? `${hours.toFixed(1)}h` : `${Math.round(hours)}h`;
+}
 
 export default function NewRun() {
   const navigate = useNavigate();
@@ -24,11 +91,48 @@ export default function NewRun() {
     notes: "",
   });
   const [opponents, setOpponents] = useState<string[]>(["random", "heuristic"]);
-  const { data: participants } = useAsync(() => api.participants(), [], 30000);
-  const externalEngines = (participants?.builtin ?? []).filter((option) => option.kind === "external");
-  const selectedExternal = opponents.filter((id) => externalEngines.some((option) => option.id === id));
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const { data: participants } = useAsync(() => api.participants(), [], 30000);
+
+  const externalOptions: OpponentMeta[] = useMemo(
+    () =>
+      (participants?.builtin ?? [])
+        .filter((option) => option.kind === "external")
+        .map((option) => {
+          const meta = EXTERNAL_META[option.id] ?? { msPerMove: 100, blurb: "External engine.", icon: "??" };
+          return {
+            id: option.id,
+            label: option.label,
+            group: "external" as const,
+            msPerMove: meta.msPerMove,
+            blurb: meta.blurb,
+            icon: meta.icon,
+            tag: meta.tag,
+            available: option.available,
+          } as OpponentMeta & { available: boolean };
+        }),
+    [participants],
+  );
+  const allOptions = [...BASE_OPPONENTS, ...externalOptions];
+  const selectedMeta = opponents.map((id) => allOptions.find((option) => option.id === id)).filter(Boolean) as OpponentMeta[];
+  const selectedExternal = selectedMeta.filter((option) => option.group === "external");
+
+  const estimate = useMemo(() => {
+    const timesteps = Number(form.timesteps) || 0;
+    const nEnvs = Math.max(1, Number(form.nEnvs) || 1);
+    const agentMs = form.vecEnv === "batched" ? 0.5 : 1.6;
+    const opponentMs = selectedMeta.length
+      ? selectedMeta.reduce((sum, option) => sum + option.msPerMove, 0) / selectedMeta.length
+      : 0;
+    let stepsPerSec = 1000 / Math.max(0.1, agentMs + opponentMs);
+    if (form.vecEnv === "subprocess") stepsPerSec *= Math.min(nEnvs, 8) * 0.85;
+    if (form.vecEnv === "batched") stepsPerSec = 1800;
+    const trainSeconds = timesteps / stepsPerSec;
+    const evaluations = Math.floor(timesteps / 50000);
+    const evalSeconds = evaluations * 25;
+    return { stepsPerSec, trainSeconds, evalSeconds, totalSeconds: trainSeconds + evalSeconds };
+  }, [form.timesteps, form.nEnvs, form.vecEnv, selectedMeta]);
 
   const toggleOpponent = (id: string) => {
     setOpponents((current) => {
@@ -90,146 +194,226 @@ export default function NewRun() {
     }
   };
 
+  const renderCard = (option: OpponentMeta & { available?: boolean }) => {
+    const selected = opponents.includes(option.id);
+    const unavailable = option.group === "external" && option.available === false;
+    return (
+      <button
+        type="button"
+        key={option.id}
+        className={`opponent-card${selected ? " selected" : ""}${unavailable ? " unavailable" : ""}`}
+        onClick={() => !unavailable && toggleOpponent(option.id)}
+        aria-pressed={selected}
+        disabled={unavailable}
+      >
+        <span className="opponent-icon">{option.icon}</span>
+        <span className="opponent-body">
+          <span className="opponent-name">{option.label}</span>
+          <span className="opponent-blurb">{option.blurb}</span>
+          <span className="opponent-meta">
+            <span className={`speed speed-${option.msPerMove < 10 ? "fast" : option.msPerMove < 100 ? "mid" : "slow"}`}>
+              {option.msPerMove === 0 ? "instant" : `~${option.msPerMove < 1 ? "<1" : option.msPerMove} ms/move`}
+            </span>
+            {option.tag && <span className="tag">{option.tag}</span>}
+            {unavailable && <span className="tag tag-warn">not built</span>}
+          </span>
+        </span>
+        <span className="opponent-check">{selected ? "✓" : ""}</span>
+      </button>
+    );
+  };
+
   return (
-    <section>
+    <section className="new-run-page">
       <div className="breadcrumb">
-        <Link to="/runs">Runs</Link> / <span>New run</span>
+        <Link to="/runs">Runs</Link> <span className="crumb-sep">/</span> <span>New run</span>
       </div>
-      <header className="page-header">
+      <header className="page-header hero">
         <div>
-          <h1>Start a new run</h1>
+          <h1>Launch an experiment</h1>
           <p className="muted">
-            The run is recorded in SQLite immediately and a training process is supervised in the background.
+            The run is persisted in SQLite immediately; training is supervised in the background and survives
+            application restarts.
           </p>
         </div>
+        <div className="hero-badge">PPO / Double DQN</div>
       </header>
 
-      <div className="panel">
-        <form className="form-grid" onSubmit={submit}>
-          <label>
-            Algorithm
-            <select value={form.algorithm} onChange={(event) => setForm({ ...form, algorithm: event.target.value })}>
-              <option value="ppo">PPO</option>
-              <option value="dqn">Double DQN</option>
-            </select>
-          </label>
-          <label>
-            Seed
-            <input type="number" value={form.seed} onChange={(event) => setForm({ ...form, seed: event.target.value })} />
-          </label>
-          <label>
-            Timesteps
-            <input
-              type="number"
-              min={1}
-              value={form.timesteps}
-              onChange={(event) => setForm({ ...form, timesteps: event.target.value })}
-            />
-          </label>
-          <label>
-            Max pieces per episode
-            <input
-              type="number"
-              min={1}
-              value={form.maxPieces}
-              onChange={(event) => setForm({ ...form, maxPieces: event.target.value })}
-            />
-          </label>
-          <label>
-            Parallel environments
-            <input
-              type="number"
-              min={1}
-              max={64}
-              value={form.nEnvs}
-              onChange={(event) => setForm({ ...form, nEnvs: event.target.value })}
-            />
-          </label>
-          <label>
-            Environment backend
-            <select value={form.vecEnv} onChange={(event) => setForm({ ...form, vecEnv: event.target.value })}>
-              <option value="dummy">In-process (reference engine)</option>
-              <option value="subprocess">Subprocess workers (reference engine)</option>
-              <option value="batched">Batched NumPy (random opponent)</option>
-            </select>
-          </label>
-          <label className="form-wide">
-            Name <span className="muted tiny">(optional)</span>
-            <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          </label>
-
-          <fieldset className="form-wide participant-set">
-            <legend>Training opponents</legend>
-            <p className="tiny muted">
-              Multiple selections are sampled per episode (mixed-opponent training). Solo disables the opponent.
-            </p>
-            {TRAINING_OPPONENTS.map((option) => (
-              <label key={option.id} className="check">
-                <input
-                  type="checkbox"
-                  checked={opponents.includes(option.id)}
-                  onChange={() => toggleOpponent(option.id)}
-                />
-                {option.label}
-              </label>
-            ))}
-
-            <div className="tiny muted" style={{ marginTop: "0.6rem", marginBottom: "0.2rem" }}>
-              External engines (built from source, placement suggesters — arena owns the rules):
-            </div>
-            {externalEngines.length === 0 && (
-              <p className="tiny muted">No external engines are available yet.</p>
-            )}
-            {externalEngines.map((option) => (
-              <label key={option.id} className="check">
-                <input
-                  type="checkbox"
-                  checked={opponents.includes(option.id)}
-                  disabled={!option.available}
-                  onChange={() => toggleOpponent(option.id)}
-                />
-                {option.label}
-                {!option.available && <span className="tiny muted"> — not built</span>}
-              </label>
-            ))}
-
-            {selectedExternal.length > 0 && (
-              <div className="form-notice" style={{ marginTop: "0.6rem" }}>
-                Slow training warning: {selectedExternal.join(", ")} run a separate search process per
-                placement (milliseconds to seconds each). Episode throughput will drop sharply and short
-                runs may not progress. Use external engines for short evaluations, tournaments, or
-                fine-tuning against a fixed opponent — not for long per-step training.
+      <form onSubmit={submit}>
+        <div className="run-layout">
+          <div className="run-main">
+            <div className="panel step-card">
+              <div className="step-heading">
+                <span className="step-index">1</span>
+                <div>
+                  <h2>Algorithm and budget</h2>
+                  <p className="tiny muted">What to train and how far to run it.</p>
+                </div>
               </div>
-            )}
-            {form.vecEnv === "batched" && (
-              <p className="tiny muted">
-                Note: the batched NumPy backend currently always plays a random opponent and ignores the
-                selection above.
-              </p>
-            )}
-          </fieldset>
+              <div className="form-grid">
+                <label>
+                  Algorithm
+                  <select value={form.algorithm} onChange={(event) => setForm({ ...form, algorithm: event.target.value })}>
+                    <option value="ppo">PPO</option>
+                    <option value="dqn">Double DQN</option>
+                  </select>
+                </label>
+                <label>
+                  Seed
+                  <input type="number" value={form.seed} onChange={(event) => setForm({ ...form, seed: event.target.value })} />
+                </label>
+                <label>
+                  Timesteps
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.timesteps}
+                    onChange={(event) => setForm({ ...form, timesteps: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Max pieces per episode
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.maxPieces}
+                    onChange={(event) => setForm({ ...form, maxPieces: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Parallel environments
+                  <input
+                    type="number"
+                    min={1}
+                    max={64}
+                    value={form.nEnvs}
+                    onChange={(event) => setForm({ ...form, nEnvs: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Environment backend
+                  <select value={form.vecEnv} onChange={(event) => setForm({ ...form, vecEnv: event.target.value })}>
+                    <option value="dummy">In-process (reference engine)</option>
+                    <option value="subprocess">Subprocess workers (reference engine)</option>
+                    <option value="batched">Batched NumPy (random opponent)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
 
-          <label className="form-wide">
-            Notes
-            <textarea
-              rows={3}
-              value={form.notes}
-              placeholder="Hypothesis, config changes, expected outcome…"
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
-            />
-          </label>
+            <div className="panel step-card">
+              <div className="step-heading">
+                <span className="step-index">2</span>
+                <div>
+                  <h2>Pick opponents</h2>
+                  <p className="tiny muted">One choice → single-stage curriculum. Several → sampled per episode.</p>
+                </div>
+                <span className="selection-count">{opponents.length} selected</span>
+              </div>
 
-          <div className="form-actions form-wide">
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? "Starting…" : "Start run"}
-            </button>
-            <Link className="btn" to="/runs">
-              Cancel
-            </Link>
-            {formError && <span className="form-error">{formError}</span>}
+              <div className="opponent-section-label">In-repo opponents</div>
+              <div className="opponent-grid">{BASE_OPPONENTS.map(renderCard)}</div>
+
+              <div className="opponent-section-label">
+                External engines <span className="tiny muted">— built from source, placement suggesters only</span>
+              </div>
+              {externalOptions.length === 0 ? (
+                <div className="empty-note">No external engines are available yet.</div>
+              ) : (
+                <div className="opponent-grid">{externalOptions.map(renderCard)}</div>
+              )}
+
+              {selectedExternal.length > 0 && (
+                <div className="warning-banner">
+                  <strong>Slow training warning:</strong> {selectedExternal.map((option) => option.label).join(", ")}{" "}
+                  launch a separate search process per placement. Throughput drops sharply; use them for short
+                  evaluations or fixed-opponent fine-tuning rather than long per-step training.
+                </div>
+              )}
+              {form.vecEnv === "batched" && (
+                <p className="tiny muted">
+                  The batched backend always plays a random opponent and ignores this selection.
+                </p>
+              )}
+            </div>
+
+            <div className="panel step-card">
+              <div className="step-heading">
+                <span className="step-index">3</span>
+                <div>
+                  <h2>Metadata</h2>
+                  <p className="tiny muted">Recorded with the run so results stay interpretable.</p>
+                </div>
+              </div>
+              <div className="form-grid">
+                <label className="form-wide">
+                  Name <span className="muted tiny">(optional)</span>
+                  <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+                </label>
+                <label className="form-wide">
+                  Notes
+                  <textarea
+                    rows={3}
+                    value={form.notes}
+                    placeholder="Hypothesis, config changes, expected outcome…"
+                    onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                  />
+                </label>
+              </div>
+            </div>
           </div>
-        </form>
-      </div>
+
+          <aside className="run-side">
+            <div className="panel estimate-card">
+              <h2>Estimated cost</h2>
+              <p className="tiny muted">Rough wall-clock estimate from opponent latency and backend.</p>
+              <div className="estimate-hero" key={Math.round(estimate.totalSeconds)}>
+                <span className="estimate-value">{humanize(estimate.totalSeconds)}</span>
+                <span className="estimate-label">estimated training time</span>
+              </div>
+              <div className="estimate-meter">
+                <span
+                  className="estimate-meter-fill"
+                  style={{ width: `${Math.min(100, 20 + Math.log10(Math.max(1, estimate.totalSeconds)) * 30)}%` }}
+                />
+              </div>
+              <div className="kv-grid estimate-kv">
+                <div>
+                  <span className="muted">Throughput</span>
+                  <div className="mono">{Math.round(estimate.stepsPerSec).toLocaleString()} steps/s</div>
+                </div>
+                <div>
+                  <span className="muted">Training</span>
+                  <div className="mono">{humanize(estimate.trainSeconds)}</div>
+                </div>
+                <div>
+                  <span className="muted">Evaluation overhead</span>
+                  <div className="mono">{humanize(estimate.evalSeconds)}</div>
+                </div>
+                <div>
+                  <span className="muted">Timesteps</span>
+                  <div className="mono">{(Number(form.timesteps) || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div className="estimate-opponents">
+                {selectedMeta.length === 0 && <span className="tiny muted">No opponent selected.</span>}
+                {selectedMeta.map((option) => (
+                  <span className="mini-chip" key={option.id}>
+                    {option.label}
+                  </span>
+                ))}
+              </div>
+              <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+                {submitting ? "Starting…" : "Start run"}
+              </button>
+              <Link className="btn btn-block" to="/runs">
+                Cancel
+              </Link>
+              {formError && <div className="form-error">{formError}</div>}
+            </div>
+          </aside>
+        </div>
+      </form>
     </section>
   );
 }

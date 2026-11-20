@@ -249,14 +249,19 @@ JSON is unavailable.
 
 ## New run page
 
-`/runs/new` is a dedicated form (linked from the Runs header):
+`/runs/new` is a dedicated, animated run builder (linked from the Runs header)
+with three sections (algorithm/budget, opponents, metadata) and a sticky
+estimated-cost card:
 
 * algorithm (PPO / Double DQN), seed, timesteps, max pieces per episode,
   parallel environments and environment backend (in-process, subprocess,
   batched NumPy);
-* training opponents as a multi-select (solo, random, heuristic, beam search,
-  seeded variants). Multiple opponents are recorded as a mixed-opponent
+* training opponents as selectable cards with a per-move speed estimate and
+  tags (solo, random, heuristic, beam search, seeded variants, and any built
+  external engine). Multiple opponents are recorded as a mixed-opponent
   curriculum; a single one as a single-stage curriculum;
+* a live estimate of throughput and wall-clock training time (including
+  evaluation overhead) derived from opponent latency and the chosen backend;
 * name and free-form experiment notes.
 
 External engines (Cold Clear, RIKU, nana, …) are selectable in the training

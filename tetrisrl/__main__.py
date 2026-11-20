@@ -58,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_tour.add_argument("--db", type=str, default=None)
     p_tour.add_argument("--replay-dir", type=str, default="results/replays")
     p_tour.add_argument("--csv", type=str, default=None)
+    p_tour.add_argument("--workers", type=int, default=4, help="parallel match processes (1 = sequential)")
 
     p_play = sub.add_parser("play", help="play against an agent in the terminal")
     p_play.add_argument("--agent", type=str, default="heuristic", help="random|heuristic|search|ppo:<ckpt>|dqn:<ckpt>")
@@ -201,6 +202,7 @@ def cmd_tournament(args) -> int:
         db=args.db,
         replay_dir=args.replay_dir,
         csv_path=args.csv,
+        workers=args.workers,
     )
     for row in result["standings"]:
         print(f"{row['name']:>12}: {row['wins']}W-{row['losses']}L-{row['draws']}D  win={row['win_rate']:.2f}")

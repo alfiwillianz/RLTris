@@ -116,3 +116,18 @@ def test_replay_frames_include_piece_colours():
         for x, ch in enumerate(row):
             occupied = bool(mask >> x & 1)
             assert occupied == (ch != ".")
+
+
+def test_parallel_round_robin_matches_sequential(tmp_path):
+    from tetrisrl.evaluation.tournament import run_round_robin
+
+    participants = [
+        {"name": "random", "spec": "random"},
+        {"name": "heuristic", "spec": "heuristic"},
+    ]
+    seq = run_round_robin(participants, n_seeds=2, max_pieces=40, seed=21, replay_dir=tmp_path / "seq", tournament_id="seq", workers=1, record_frames=False)
+    par = run_round_robin(participants, n_seeds=2, max_pieces=40, seed=21, replay_dir=tmp_path / "par", tournament_id="par", workers=2, record_frames=False)
+    assert [(r["name"], r["wins"], r["losses"]) for r in seq["standings"]] == [
+        (r["name"], r["wins"], r["losses"]) for r in par["standings"]
+    ]
+    assert [m["ticks"] for m in seq["matches"]] == [m["ticks"] for m in par["matches"]]

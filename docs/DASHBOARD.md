@@ -292,8 +292,9 @@ for external engines and in-repo baselines, plus a searchable checkpoint
 picker (filter by run id, algorithm, step or path; cards show algorithm, step
 and eval win rate). Selected participants appear as chips in a sticky line-up
 card that computes the scheduled match count (`C(n,2) × seeds`). Submission
-posts the same `{name, participants, seeds, max_pieces}` payload the API
-already accepts; `ppo:<path>` / `dqn:<path>` specs load through the policy
+posts the same `{name, participants, seeds, max_pieces, workers}` payload the
+API already accepts; matches run in parallel worker processes (default
+`min(4, cpu)`, capped by the number of matches) with deterministic seeds; `ppo:<path>` / `dqn:<path>` specs load through the policy
 agent. The Tournaments list page now only shows history and deletion.
 
 ## 5. Replay format and viewer

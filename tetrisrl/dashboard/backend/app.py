@@ -174,6 +174,7 @@ class TournamentRequest(BaseModel):
     participants: List[str] = Field(default_factory=lambda: ["random", "heuristic"])
     seeds: Any = 1
     max_pieces: int = Field(default=500, ge=1, le=100_000)
+    workers: int = Field(default=0, ge=0, le=16)
 
 
 # ---------------------------------------------------------------------------
@@ -699,6 +700,41 @@ def _write_tournament_csv(path: Path, tournament_id: str, matches: Sequence[Dict
     path.write_text(buffer.getvalue(), encoding="utf-8")
 
 
+def _tournament_match_worker(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Process-pool worker: one independent, seeded match (no DB writes)."""
+    from ...agents import make_agent
+    from ...environment.versus import VersusMatch
+
+    try:
+        agent_a = make_agent(task["spec_a"], seed=task["seed"])
+        agent_b = make_agent(task["spec_b"], seed=task["seed"] + 1)
+        match = VersusMatch(
+            agent_a,
+            agent_b,
+            seed=int(task["seed"]),
+            max_pieces=int(task["max_pieces"]),
+            match_id=task["match_id"],
+            metadata={"tournament_id": task["tournament_id"], "participants": task["names"]},
+        )
+        result = match.run()
+        replay_path = Path(task["replay_path"])
+        replay_path.parent.mkdir(parents=True, exist_ok=True)
+        replay_path.write_text(json.dumps(result.replay), encoding="utf-8")
+        return {
+            "id": task["match_id"],
+            "seed": int(task["seed"]),
+            "agent_a": task["names"][0],
+            "agent_b": task["names"][1],
+            "winner": result.winner,
+            "reason": result.reason,
+            "ticks": int(result.ticks),
+            "replay_path": str(replay_path),
+            "stats": [s.to_dict() for s in result.stats],
+        }
+    except Exception as exc:
+        return {"id": task["match_id"], "error": f"{type(exc).__name__}: {exc}"}
+
+
 def _run_tournament(
     manager: ExperimentManager,
     artifacts: Path,
@@ -707,64 +743,65 @@ def _run_tournament(
     seeds: Sequence[int],
     max_pieces: int,
     name: str,
+    workers: int = 0,
 ) -> None:
     limitations: List[str] = []
     match_records: List[Dict[str, Any]] = []
     failures: List[str] = []
     try:
-        from ...environment.versus import VersusMatch
-
         pairs = list(itertools.combinations(range(len(participants)), 2))
         replays_dir = artifacts / "replays"
         replays_dir.mkdir(parents=True, exist_ok=True)
+        tasks: List[Dict[str, Any]] = []
         for pair_index, (ia, ib) in enumerate(pairs):
             for seed in seeds:
                 match_id = f"{tournament_id}-m{pair_index:03d}-s{seed}"
-                try:
-                    agent_a = _build_agent(participants[ia], limitations)
-                    agent_b = _build_agent(participants[ib], limitations)
-                    match = VersusMatch(
-                        agent_a,
-                        agent_b,
-                        seed=int(seed),
-                        max_pieces=int(max_pieces),
-                        match_id=match_id,
-                        metadata={
-                            "tournament_id": tournament_id,
-                            "tournament_name": name,
-                            "participants": [participants[ia], participants[ib]],
-                        },
-                    )
-                    result = match.run()
-                    replay = result.replay
-                    replay_path = replays_dir / f"{match_id}.json"
-                    replay_path.write_text(json.dumps(replay), encoding="utf-8")
-                    record = {
-                        "id": match_id,
+                name_pair = [participants[ia], participants[ib]]
+                tasks.append(
+                    {
+                        "spec_a": name_pair[0],
+                        "spec_b": name_pair[1],
+                        "names": name_pair,
                         "seed": int(seed),
-                        "agent_a": participants[ia],
-                        "agent_b": participants[ib],
-                        "winner": result.winner,
-                        "reason": result.reason,
-                        "ticks": int(result.ticks),
-                        "replay_path": str(replay_path),
-                        "stats": [s.to_dict() for s in result.stats],
+                        "max_pieces": int(max_pieces),
+                        "match_id": match_id,
+                        "tournament_id": tournament_id,
+                        "replay_path": str(replays_dir / f"{match_id}.json"),
                     }
-                    manager.add_match(
-                        match_id=match_id,
-                        agent_a=participants[ia],
-                        agent_b=participants[ib],
-                        winner=result.winner,
-                        reason=result.reason,
-                        ticks=int(result.ticks),
-                        seed=int(seed),
-                        replay_path=str(replay_path),
-                        stats={"players": [s.to_dict() for s in result.stats]},
-                        tournament_id=tournament_id,
-                    )
-                    match_records.append(record)
-                except Exception as exc:
-                    failures.append(f"{match_id}: {type(exc).__name__}: {exc}")
+                )
+        workers = max(1, min(int(workers or min(4, os.cpu_count() or 4)), len(tasks) or 1))
+        if workers == 1:
+            records = [_tournament_match_worker(task) for task in tasks]
+        else:
+            import multiprocessing
+            from concurrent.futures import ProcessPoolExecutor
+
+            # spawn (not fork): forking a threaded uvicorn process deadlocks
+            # pool workers before they can import the simulation.
+            with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as pool:
+                records = list(pool.map(_tournament_match_worker, tasks))
+
+        for record in records:
+            if "error" in record:
+                failures.append(f"{record['id']}: {record['error']}")
+                continue
+            match_records.append(record)
+            try:
+                manager.add_match(
+                    match_id=record["id"],
+                    agent_a=record["agent_a"],
+                    agent_b=record["agent_b"],
+                    winner=record["winner"],
+                    reason=record["reason"],
+                    ticks=record["ticks"],
+                    seed=record["seed"],
+                    replay_path=record["replay_path"],
+                    stats={"players": record["stats"]},
+                    tournament_id=tournament_id,
+                )
+            except Exception as exc:
+                failures.append(f"{record['id']}: db write failed: {exc}")
+
         standings = _standings(participants, match_records)
         limitations[:] = list(dict.fromkeys(limitations))
         results = {
@@ -1360,6 +1397,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 seeds,
                 payload.max_pieces,
                 payload.name,
+                payload.workers,
             ),
             name=f"tetrisrl-tournament-{tournament_id}",
             daemon=True,

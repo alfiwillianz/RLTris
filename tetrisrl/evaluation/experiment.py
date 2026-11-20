@@ -39,6 +39,7 @@ def run_tournament_and_persist(
     db: Optional[str] = None,
     replay_dir: str = "results/replays",
     csv_path: Optional[str] = None,
+    workers: int = 1,
 ) -> Dict[str, Any]:
     manager = ExperimentManager(db)
     tournament_id = manager.create_tournament(name, {"participants": list(participants), "n_seeds": n_seeds, "max_pieces": max_pieces, "ruleset": ruleset})
@@ -52,6 +53,7 @@ def run_tournament_and_persist(
             replay_dir=replay_dir,
             tournament_id=tournament_id,
             manager=manager,
+            workers=workers,
         )
         out_csv = csv_path or f"results/tournaments/{tournament_id}.csv"
         export_csv(results, out_csv)

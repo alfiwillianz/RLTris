@@ -229,3 +229,26 @@ before switching any reported experiment.
 The spawn-kick change made for exact action semantics (an action's column is
 the placement's left-most occupied column) is documented in the placement module
 and covered by the SRS tests.
+
+
+### Batched training environment
+
+`tetrisrl/training/batched_env.py` wires that core into the RL interface
+(`reset/step/action_masks`, `num_envs`, `observation_size`), with vectorised
+observations using the same 889-float layout and the same `RewardConfig`.
+
+* Measured: about **8,000 board-steps/s** (agent + random opponent boards) at
+  64/256/512 boards, versus ~600–1,350 for the reference engine; a PPO run with
+  `--vec-env batched --n-envs 64` trains at **~2,100 env-steps/s** including the
+  batched policy update and evaluation-free logging.
+* Selected via `python -m tetrisrl train --algorithm ppo --vec-env batched --n-envs 64`.
+
+**Simplifications (must be stated in any result that uses it).** The batched
+training backend always plays against a uniform-random opponent (no curriculum
+opponent switching yet), does not detect spins, does not split Surge into three
+independently cancelled segments, and applies garbage with a one-piece delay.
+Its rewards and observations follow the shared definitions; scoring uses the
+reference `compute_attack`. It is therefore suitable for pretraining and
+throughput research, and headline comparisons continue to use the reference
+engine until the remaining mechanics are ported and the differential suite is
+extended to full episodes.

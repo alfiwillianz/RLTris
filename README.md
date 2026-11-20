@@ -24,7 +24,7 @@ local web dashboard for long training runs.
 | Training | Config-driven curriculum, opponent schedules (solo/random/heuristic/search/mixed/self-play), vectorised envs (in-process and subprocess), periodic evaluation with confidence intervals, resume, graceful stop, SQLite metrics |
 | Dashboard | FastAPI backend + React/TypeScript frontend, SQLite persistence, live training charts, algorithm comparison, tournaments, dual-board replay viewer with playback controls, checkpoint browser |
 | Evaluation | Round-robin tournaments, CSV export, paired-seed evaluation, Wilson intervals, statistical summaries, reward/observation/ruleset ablations |
-| Batched backend | NumPy placement/board core, 24.7x reference throughput, differential parity tests (`environment/batched.py`, `scripts/benchmark_batched.py`) |
+| Batched backend | NumPy placement/board core (24.7x reference on placement/board work, differential parity tests) plus a vectorised versus training env (~8k board-steps/s, random opponent) selectable with `--vec-env batched` |
 | External engine | Cold Clear 2 (pinned commit, built from source) driven over TBP; 20 real matches executed (10-0-0 vs heuristic, 10-0-0 vs random), 0.42% fallbacks. See `docs/BENCHMARKS_INTEGRATION.md` |
 | Tests | 120+ automated tests covering board, geometry, kicks, spins, scoring, garbage, versus determinism, replays, observation, rewards, agents, PPO/DQN math, persistence and dashboard |
 

@@ -83,53 +83,46 @@ class BatchedBoard:
         first = np.where(any_block, first, HEIGHT)
         return first  # [N, 10]
 
-    def resolve_actions(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Resolve every action for every board.
+    def resolve_actions(self, piece_ids: np.ndarray | None = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Resolve every action for every board (vectorised over actions too).
 
-        Returns ``(valid [N,80], ys [N,80], cells [N,80,4,2])`` where ``cells``
-        are absolute board coordinates (``-1`` for unused pad slots).
+        Returns ``(valid [N,80], ys [N,80], cells [N,80,4,2])``.
         """
         n = self.n
-        obstacles = self._column_obstacles()
-        valid = np.zeros((n, N_ACTIONS), dtype=bool)
-        ys = np.full((n, N_ACTIONS), -1, dtype=np.int16)
-        cells_out = np.full((n, N_ACTIONS, 4, 2), -1, dtype=np.int16)
+        pieces = self.pieces if piece_ids is None else np.asarray(piece_ids, dtype=np.int16)
+        obstacles = self._column_obstacles()  # [N, 10]
 
-        for rotation in range(4):
-            for column in range(WIDTH):
-                base = rotation * 20 + column * 2
-                # same placement for hold/non-hold in this core; the caller
-                # decides which piece is being placed.
-                for action in (base, base + 1):
-                    piece = self._piece_for_action(action)
-                    x = column - LEFT_OFFSET_NP[piece, rotation]  # [N]
-                    cell_dx = CELLS_PAD[piece, rotation, :, 0]  # [N,4]
-                    cell_dy = CELLS_PAD[piece, rotation, :, 1]
-                    cols = x[:, None] + cell_dx  # [N,4]
-                    inside = (cols >= 0) & (cols < WIDTH) & (cell_dx >= 0)
-                    # landing row per cell: obstacle(col) - dy - 1
-                    safe_cols = np.clip(cols, 0, WIDTH - 1)
-                    block = np.take_along_axis(obstacles, safe_cols, axis=1)  # [N,4]
-                    land = block - cell_dy - 1
-                    land = np.where(inside, land, HEIGHT)
-                    y = land.min(axis=1)  # [N]
-                    # Spawn-space fit: the piece must exist at the spawn row
-                    # (no upward kicks in this core).
-                    spawn_rows = self.spawn_y + cell_dy  # [N,4]
-                    spawn_ok = np.ones(n, dtype=bool)
-                    for k in range(4):
-                        r = spawn_rows[:, k]
-                        c = safe_cols[:, k]
-                        in_board = inside[:, k] & (r >= 0) & (r < HEIGHT)
-                        spawn_ok &= in_board
-                        spawn_ok &= ~(((self.rows[np.arange(n), np.clip(r, 0, HEIGHT - 1)] >> c) & 1).astype(bool))
-                    y = np.where(spawn_ok, y, -1)
-                    ok = spawn_ok & (y >= self.spawn_y) & (y + cell_dy.max(axis=1) < HEIGHT)
-                    valid[:, action] = ok
-                    ys[:, action] = np.where(ok, y, -1)
-                    abs_cells = np.stack([x[:, None] + cell_dx, np.where(ok, y, -1)[:, None] + cell_dy], axis=2)
-                    cells_out[:, action] = np.where(ok[:, None, None], abs_cells, -1)
-        return valid, ys, cells_out
+        actions = np.arange(N_ACTIONS, dtype=np.int16)
+        rot = (actions // 20).astype(np.int16)          # [80]
+        col = ((actions // 2) % 10).astype(np.int16)    # [80]
+
+        x = col[None, :] - LEFT_OFFSET_NP[pieces[:, None], rot[None, :]]  # [N,80]
+        dx = CELLS_PAD[pieces[:, None], rot[None, :], :, 0].astype(np.int16)  # [N,80,4]
+        dy = CELLS_PAD[pieces[:, None], rot[None, :], :, 1].astype(np.int16)
+        real = dx >= 0
+        cols = x[:, :, None] + dx                      # [N,80,4]
+        inside = real & (cols >= 0) & (cols < WIDTH)
+        safe = np.clip(cols, 0, WIDTH - 1)
+
+        block = obstacles[np.arange(n)[:, None, None], safe]  # [N,80,4]
+        land = block - dy - 1
+        land = np.where(inside, land, HEIGHT)
+        y = land.min(axis=2)                           # [N,80]
+
+        spawn_r = self.spawn_y + dy
+        spawn_occ = (self.rows[np.arange(n)[:, None, None], np.clip(spawn_r, 0, HEIGHT - 1)] >> safe.astype(np.uint16)) & 1
+        spawn_ok = (
+            inside
+            & (spawn_r >= 0)
+            & (spawn_r < HEIGHT)
+            & (spawn_occ == 0)
+        ).all(axis=2)
+        ok = spawn_ok & (y >= self.spawn_y) & (y + dy.max(axis=2) < HEIGHT)
+        y = np.where(ok, y, -1).astype(np.int16)
+
+        cells = np.stack([x[:, :, None] + dx, y[:, :, None] + dy], axis=3)
+        cells = np.where(ok[:, :, None, None], cells, -1).astype(np.int16)
+        return ok, y, cells
 
     def _piece_for_action(self, action: int) -> np.ndarray:
         """Piece id per board for an action (hold is resolved by the caller)."""
@@ -177,6 +170,17 @@ class BatchedBoard:
             mask = np.uint16(self.full_row & ~(1 << int(holes[i])))
             out[i, HEIGHT - k :] = mask
         self.rows = out
+        return overflow
+
+    def insert_garbage_one(self, board_index: int, amount: int, hole: int) -> bool:
+        """Insert garbage into a single board; returns True on overflow."""
+        k = min(int(amount), HEIGHT)
+        if k <= 0:
+            return False
+        row = self.rows[board_index]
+        overflow = bool(row[:k].any())
+        self.rows[board_index, : HEIGHT - k] = row[k:]
+        self.rows[board_index, HEIGHT - k :] = np.uint16(self.full_row & ~(1 << int(hole)))
         return overflow
 
     def state_hash(self) -> np.ndarray:

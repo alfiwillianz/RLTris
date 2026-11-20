@@ -24,6 +24,24 @@ def _unwrap(value: Any) -> Any:
     return value
 
 
+def _act_batch(agent: PPOAgent, obs: np.ndarray, masks: np.ndarray):
+    """Vectorised policy evaluation for all environments at once."""
+    import torch
+    from ..rl.masked import masked_categorical, masked_log_softmax
+
+    obs_t = torch.as_tensor(obs, dtype=torch.float32, device=agent.device)
+    mask_t = torch.as_tensor(masks, dtype=torch.bool, device=agent.device)
+    with torch.no_grad():
+        logits, values = agent.model(obs_t)
+        actions = masked_categorical(logits, mask_t).sample()
+        logp = masked_log_softmax(logits, mask_t).gather(1, actions.unsqueeze(1)).squeeze(1)
+    return (
+        actions.cpu().numpy().astype(np.int64),
+        logp.cpu().numpy().astype(np.float32),
+        values.reshape(-1).cpu().numpy().astype(np.float32),
+    )
+
+
 def collect_rollout(envs, agent: PPOAgent, obs: np.ndarray, rollout_steps: int, gamma: float, ctx: RunContext, stats: Dict[str, Any]):
     n_envs = envs.num_envs
     obs_size = envs.observation_size
@@ -43,9 +61,7 @@ def collect_rollout(envs, agent: PPOAgent, obs: np.ndarray, rollout_steps: int, 
         actions = np.zeros(n_envs, dtype=np.int64)
         logps = np.zeros(n_envs, dtype=np.float32)
         values = np.zeros(n_envs, dtype=np.float32)
-        for i in range(n_envs):
-            a, lp, v = agent.act(obs[i], masks[i])
-            actions[i], logps[i], values[i] = a, lp, v
+        actions, logps, values = _act_batch(agent, obs, masks)
         next_obs, rewards, terminated, truncated, infos = envs.step(actions)
 
         # Bootstrap truncated episodes (time limit) with V(s_{t+1}).
@@ -168,13 +184,30 @@ def train_ppo(cfg: TrainConfig, ctx: RunContext, agent: Optional[PPOAgent] = Non
             stage_step = 0
             continue
 
-        envs = make_vec_env(
-            lambda stage=stage: ctx.make_env(stage, seed=cfg.seed + stage_step),
-            n_envs=cfg.n_envs,
-            seed=cfg.seed + step,
-            kind=cfg.vec_env,
-        )
-        obs, _ = envs.reset(seeds=[cfg.seed + step + i for i in range(cfg.n_envs)])
+        if cfg.vec_env == "batched":
+            from .batched_env import BatchedVersusEnv
+
+            envs = BatchedVersusEnv(
+                n_envs=cfg.n_envs,
+                seed=cfg.seed + step,
+                max_pieces=stage.max_pieces,
+                reward_config=ctx.reward_config(stage),
+                include_opponent=cfg.include_opponent,
+            )
+            obs, _ = envs.reset()
+            print(
+                f"[ppo] batched backend: {cfg.n_envs} boards/step (random opponent; "
+                "spin/garbage-delay simplifications documented)",
+                flush=True,
+            )
+        else:
+            envs = make_vec_env(
+                lambda stage=stage: ctx.make_env(stage, seed=cfg.seed + stage_step),
+                n_envs=cfg.n_envs,
+                seed=cfg.seed + step,
+                kind=cfg.vec_env,
+            )
+            obs, _ = envs.reset(seeds=[cfg.seed + step + i for i in range(cfg.n_envs)])
         t0 = time.time()
         steps_this_stage = 0
         try:
@@ -220,7 +253,8 @@ def train_ppo(cfg: TrainConfig, ctx: RunContext, agent: Optional[PPOAgent] = Non
                     print(f"[{ctx.run_id}] step {step:,} | {eprint} | {throughput:,.0f} steps/s", flush=True)
                 t0 = time.time()
         finally:
-            envs.close()
+            if hasattr(envs, "close"):
+                envs.close()
         if not ctx.stop_requested and remaining_total > 0:
             stage_index += 1
             stage_step = 0

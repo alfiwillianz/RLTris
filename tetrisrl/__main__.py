@@ -15,7 +15,7 @@ def _add_common_train_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--timesteps", type=int, default=None)
     p.add_argument("--n-envs", type=int, default=None)
-    p.add_argument("--vec-env", choices=["dummy", "subprocess"], default=None)
+    p.add_argument("--vec-env", choices=["dummy", "subprocess", "batched"], default=None)
     p.add_argument("--run-id", type=str, default=None)
     p.add_argument("--resume", type=str, default=None, help="checkpoint path to resume from")
     p.add_argument("--stage", type=str, default=None, help="run only one curriculum stage by name")

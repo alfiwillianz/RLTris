@@ -243,12 +243,17 @@ observations using the same 889-float layout and the same `RewardConfig`.
   batched policy update and evaluation-free logging.
 * Selected via `python -m tetrisrl train --algorithm ppo --vec-env batched --n-envs 64`.
 
-**Simplifications (must be stated in any result that uses it).** The batched
-training backend always plays against a uniform-random opponent (no curriculum
-opponent switching yet), does not detect spins, does not split Surge into three
-independently cancelled segments, and applies garbage with a one-piece delay.
-Its rewards and observations follow the shared definitions; scoring uses the
-reference `compute_attack`. It is therefore suitable for pretraining and
-throughput research, and headline comparisons continue to use the reference
-engine until the remaining mechanics are ported and the differential suite is
-extended to full episodes.
+**Ruleset port status.** SRS+ placement, T spin-in (rotation-at-rest with the
+official kick tables, including hold actions), T-spin corner detection
+(full/mini, gated on a rotation or a verified spin-in), the full Season 2 attack
+model (reference `compute_attack`: combo multiplier, B2B charging, three-segment
+Surge released on a break, All Clear) and a one-piece garbage receive delay with
+per-placement tanking are ported and covered by differential parity tests
+(`tests/test_batched.py`, TSD cavity included). Observation and reward use the
+shared definitions.
+
+Remaining differences, which any result from this backend must state: the
+opponent is always uniform-random (no curriculum opponent switching), non-T
+spins and the TST "1x2 kick upgrades mini to full" rule are not ported, and the
+piece/garbage RNG streams differ from a reference `GameState`. Headline
+experiments therefore continue to run on the reference engine.

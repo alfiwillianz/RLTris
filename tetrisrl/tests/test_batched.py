@@ -118,3 +118,45 @@ def test_batched_resolution_throughput():
     rate = steps * n / dt
     assert rate > 2000, f"batched core too slow: {rate:.0f} boards/s"
     print(f"batched core: {rate:,.0f} board-steps/s")
+
+
+def test_spin_in_parity_on_tsd_cavity(monkeypatch):
+    """Batched spin-in must reproduce the reference TSD placement exactly."""
+    monkeypatch.setattr(placement_mod, "SPIN_IN_PIECES", ("T",))
+    from tetrisrl.environment.pieces import ActivePiece
+
+    def bits(*cols):
+        mask = 0
+        for c in cols:
+            mask |= 1 << c
+        return mask
+
+    rows = [0] * HEIGHT
+    rows[36] = bits(3)
+    rows[37] = bits(0, 1, 2, 6, 7, 8, 9)
+    rows[38] = bits(0, 1, 2, 3, 5, 6, 7, 8, 9)
+    rows[39] = bits(0, 1, 2, 3, 4, 5, 6, 7, 8)
+
+    state = GameState(seed=0)
+    state.board.rows = list(rows)
+    state.current = ActivePiece("T", 0, state._spawn_x("T"), state.ruleset.board.spawn_y)
+    state.hold = "T"
+    state.can_hold = True
+    state.invalidate()
+
+    batched = BatchedBoard(1)
+    batched.rows[0] = np.array(rows, dtype=np.uint16)
+    batched.pieces[0] = PIECE_INDEX["T"]
+    valid, ys, cells = batched.resolve_actions()
+
+    np.testing.assert_array_equal(valid[0], np.array(state.action_mask()))
+    for action in range(80):
+        if not valid[0, action]:
+            continue
+        placement = state.resolve(action)
+        got = {(int(x), int(y)) for x, y in cells[0, action] if x >= 0}
+        assert got == set(placement.cells), action
+        assert int(ys[0, action]) == placement.y
+    # The TSD placement must be available and deeper than a plain drop.
+    cells_tsd = {(3, 37), (4, 37), (5, 37), (4, 38)}
+    assert any({(int(x), int(y)) for x, y in cells[0, a] if x >= 0} == cells_tsd for a in range(80))

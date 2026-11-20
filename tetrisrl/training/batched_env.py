@@ -76,8 +76,10 @@ class BatchedVersusEnv:
 
         self.clear_a = [ClearState() for _ in range(self.n)]
         self.clear_b = [ClearState() for _ in range(self.n)]
-        self.pending_a = np.zeros(self.n, dtype=np.int16)
+        self.pending_a = np.zeros(self.n, dtype=np.int16)   # incoming, not yet active
         self.pending_b = np.zeros(self.n, dtype=np.int16)
+        self.ready_a = np.zeros(self.n, dtype=np.int16)     # active garbage
+        self.ready_b = np.zeros(self.n, dtype=np.int16)
         self.done = np.zeros(self.n, dtype=bool)
         self.won = np.zeros(self.n, dtype=np.int8)  # 1 win, -1 loss, 0 none
         self.steps = np.zeros(self.n, dtype=np.int64)
@@ -127,6 +129,8 @@ class BatchedVersusEnv:
         self.clear_b = [ClearState() for _ in range(self.n)]
         self.pending_a[:] = 0
         self.pending_b[:] = 0
+        self.ready_a[:] = 0
+        self.ready_b[:] = 0
         self.done[:] = False
         self.won[:] = 0
         self.steps[:] = 0
@@ -168,38 +172,85 @@ class BatchedVersusEnv:
         cells = np.where(use_hold[:, None, None], hold_cells, cur_cells)
         piece_used = np.where(use_hold, hold_idx, self.current_a)
 
+        # Garbage received during the previous tick becomes active now
+        # (one-piece receive delay, matching the reference engine's
+        # garbagespeed approximation).
+        self.ready_a += self.pending_a
+        self.ready_b += self.pending_b
+        self.pending_a[:] = 0
+        self.pending_b[:] = 0
+
         lines_a = np.zeros(self.n, dtype=np.int16)
         sent_a = np.zeros(self.n, dtype=np.int16)
         inserted_a = np.zeros(self.n, dtype=np.int16)
         cancelled_a = np.zeros(self.n, dtype=np.int16)
 
-        # lock and clear only valid placements (invalid ones lose their turn)
         self.agent.lock(cells, np.arange(self.n))
         lines_a = self.agent.clear_lines()
-
         perfect = ~self.agent.rows.any(axis=1)
+
+        # T-spin detection (corner rule) for the chosen placements.
+        rotations = (actions // 20).astype(np.int16)
+        columns = ((actions // 2) % 10).astype(np.int16)
+        origin_x = columns - LEFT_OFFSET_NP[piece_used, rotations]
+        tdy_min = CELLS_PAD[piece_used, rotations, 0, 1].astype(np.int16)
+        # Pad slots use (-1,-1); the first cell is always real.
+        origin_y = cells[:, 0, 1].astype(np.int16) - tdy_min  # first cell is always real
+
+        def corner_mask(x0: np.ndarray, y0: np.ndarray, dx: int, dy: int) -> np.ndarray:
+            xx = x0 + dx
+            yy = y0 + dy
+            outside = (xx < 0) | (xx >= WIDTH) | (yy >= HEIGHT)
+            inside = (yy >= 0) & (yy < HEIGHT)
+            occ = np.zeros(self.n, dtype=bool)
+            valid = inside & ~outside
+            if valid.any():
+                occ[valid] = ((self.agent.rows[valid, yy[valid]] >> np.clip(xx[valid], 0, WIDTH - 1).astype(np.uint16)) & 1).astype(bool)
+            return occ | outside
+
+        corners = np.stack([corner_mask(origin_x, origin_y, 0, 0), corner_mask(origin_x, origin_y, 2, 0),
+                            corner_mask(origin_x, origin_y, 0, 2), corner_mask(origin_x, origin_y, 2, 2)], axis=1)
+        front_idx = {0: (0, 1), 1: (1, 3), 2: (2, 3), 3: (0, 2)}
+        front = np.zeros(self.n, dtype=np.int8)
+        total = corners.sum(axis=1)
+        for r_idx, idxs in front_idx.items():
+            mask_r = rotations == r_idx
+            if mask_r.any():
+                front[mask_r] = corners[mask_r][:, list(idxs)].sum(axis=1)
+        is_t = piece_used == PIECE_INDEX["T"]
+        spin_in_used = self.agent.spin_in_used[np.arange(self.n), actions]
+        rotated = (rotations != 0) | spin_in_used
+        spin = is_t & (total >= 3) & rotated
+        mini = spin & (front < 2)
+
         attack_events: List[List[int]] = []
         for i in range(self.n):
             if lines_a[i] > 0:
                 comp = compute_attack(
-                    self.ruleset, self.clear_a[i], int(lines_a[i]), False, False, bool(perfect[i])
+                    self.ruleset, self.clear_a[i], int(lines_a[i]), bool(spin[i]), bool(mini[i]), bool(perfect[i])
                 )
                 events = list(comp.attack_events)
             else:
                 events = on_no_clear(self.ruleset, self.clear_a[i])
-            attack = int(sum(events))
-            cancelled = min(int(self.pending_a[i]), attack)
-            self.pending_a[i] -= cancelled
-            sent = attack - cancelled
-            cancelled_a[i] = cancelled
+            remaining_queue = int(self.ready_a[i])
+            sent = 0
+            for event in events:
+                if event <= 0:
+                    continue
+                cancelled = min(remaining_queue, event)
+                remaining_queue -= cancelled
+                cancelled_a[i] += cancelled
+                sent += event - cancelled
+            self.ready_a[i] = remaining_queue
             sent_a[i] = sent
+            self.pending_b[i] = min(40, int(self.pending_b[i]) + int(sent))
             attack_events.append([sent])
             self.episode_lines[i] += int(lines_a[i])
-            self.episode_attack[i] += attack
+            self.episode_attack[i] += int(sum(events))
 
         # ---- opponent placement (uniform random legal placement) -------
         opp_valid, _ys, opp_cells = self.opp.resolve_actions(self.current_b)
-        opp_valid[:, 1::2] &= self.can_hold_b[:, None]
+        opp_valid[:, 1::2] = False  # opponent does not use hold in this backend
         weights = opp_valid * self.rng.random((self.n, N_ACTIONS))
         opp_actions = np.argmax(weights, axis=1).astype(np.int64)
         chosen_opp_cells = opp_cells[np.arange(self.n), opp_actions]
@@ -213,26 +264,32 @@ class BatchedVersusEnv:
                 events = list(comp.attack_events)
             else:
                 events = on_no_clear(self.ruleset, self.clear_b[i])
-            attack = int(sum(events))
-            cancelled = min(int(self.pending_b[i]), attack)
-            self.pending_b[i] -= cancelled
-            sent_b[i] = attack - cancelled
-            self.pending_a[i] = min(40, int(self.pending_a[i]) + int(sent_b[i]))
+            remaining_queue = int(self.ready_b[i])
+            sent = 0
+            for event in events:
+                if event <= 0:
+                    continue
+                cancelled = min(remaining_queue, event)
+                remaining_queue -= cancelled
+                sent += event - cancelled
+            self.ready_b[i] = remaining_queue
+            sent_b[i] = sent
+            self.pending_a[i] = min(40, int(self.pending_a[i]) + int(sent))
 
         # ---- garbage tank on non-clearing locks ------------------------
         for i in range(self.n):
-            if lines_a[i] == 0 and self.pending_a[i] > 0:
-                amount = int(min(8, self.pending_a[i]))
-                self.pending_a[i] -= amount
+            if lines_a[i] == 0 and self.ready_a[i] > 0:
+                amount = int(min(8, self.ready_a[i]))
+                self.ready_a[i] -= amount
                 hole = int(self.rng.integers(0, WIDTH))
                 overflow = self.agent.insert_garbage_one(i, amount, hole)
                 inserted_a[i] = amount
                 if overflow:
                     self.done[i] = True
                     self.won[i] = -1
-            if lines_b[i] == 0 and self.pending_b[i] > 0:
-                amount = int(min(8, self.pending_b[i]))
-                self.pending_b[i] -= amount
+            if lines_b[i] == 0 and self.ready_b[i] > 0:
+                amount = int(min(8, self.ready_b[i]))
+                self.ready_b[i] -= amount
                 hole = int(self.rng.integers(0, WIDTH))
                 self.opp.insert_garbage_one(i, amount, hole)
 
@@ -303,6 +360,8 @@ class BatchedVersusEnv:
         self.clear_b[i] = ClearState()
         self.pending_a[i] = 0
         self.pending_b[i] = 0
+        self.ready_a[i] = 0
+        self.ready_b[i] = 0
         self.done[i] = False
         self.won[i] = 0
         self.steps[i] = 0
@@ -393,7 +452,7 @@ class BatchedVersusEnv:
                 b2b,
                 surge,
                 surge_flag,
-                self.pending_a / 20.0,
+                (self.ready_a + self.pending_a) / 20.0,
                 np.zeros(n, dtype=np.float32),
                 np.zeros(n, dtype=np.float32),
                 lines,

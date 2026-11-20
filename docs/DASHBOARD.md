@@ -259,11 +259,16 @@ JSON is unavailable.
   curriculum; a single one as a single-stage curriculum;
 * name and free-form experiment notes.
 
-External engines (Cold Clear, RIKU, nana, …) are intentionally not offered in
-the training picker: they take milliseconds to seconds per placement, so they
-belong in tournaments/evaluation where the dashboard exposes them as
-participants. The form posts `{algorithm, seed, timesteps, notes, config}`, and
-the backend persists the run before spawning the supervised training process.
+External engines (Cold Clear, RIKU, nana, …) are selectable in the training
+picker with their availability checked against the built binaries; unavailable
+engines are disabled and marked "not built". Selecting one shows a prominent
+slow-training warning: each placement launches a separate search process
+(milliseconds to seconds), so episode throughput collapses and short runs may
+not progress. They are intended for short evaluations, fixed-opponent
+fine-tuning and tournaments; the batched backend additionally ignores the
+selection because it always plays a random opponent. The form posts
+`{algorithm, seed, timesteps, notes, config}`, and the backend persists the run
+before spawning the supervised training process.
 
 ## 5. Replay format and viewer
 

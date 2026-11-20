@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { useAsync } from "../hooks";
 
 const TRAINING_OPPONENTS = [
   { id: "none", label: "Solo / survival (no opponent)" },
@@ -23,6 +24,9 @@ export default function NewRun() {
     notes: "",
   });
   const [opponents, setOpponents] = useState<string[]>(["random", "heuristic"]);
+  const { data: participants } = useAsync(() => api.participants(), [], 30000);
+  const externalEngines = (participants?.builtin ?? []).filter((option) => option.kind === "external");
+  const selectedExternal = opponents.filter((id) => externalEngines.some((option) => option.id === id));
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -169,10 +173,40 @@ export default function NewRun() {
                 {option.label}
               </label>
             ))}
-            <p className="tiny muted">
-              External engines (Cold Clear, RIKU, nana…) are far too slow for per-step training; use them in{" "}
-              <Link to="/tournaments">tournaments</Link> or evaluation instead.
-            </p>
+
+            <div className="tiny muted" style={{ marginTop: "0.6rem", marginBottom: "0.2rem" }}>
+              External engines (built from source, placement suggesters — arena owns the rules):
+            </div>
+            {externalEngines.length === 0 && (
+              <p className="tiny muted">No external engines are available yet.</p>
+            )}
+            {externalEngines.map((option) => (
+              <label key={option.id} className="check">
+                <input
+                  type="checkbox"
+                  checked={opponents.includes(option.id)}
+                  disabled={!option.available}
+                  onChange={() => toggleOpponent(option.id)}
+                />
+                {option.label}
+                {!option.available && <span className="tiny muted"> — not built</span>}
+              </label>
+            ))}
+
+            {selectedExternal.length > 0 && (
+              <div className="form-notice" style={{ marginTop: "0.6rem" }}>
+                Slow training warning: {selectedExternal.join(", ")} run a separate search process per
+                placement (milliseconds to seconds each). Episode throughput will drop sharply and short
+                runs may not progress. Use external engines for short evaluations, tournaments, or
+                fine-tuning against a fixed opponent — not for long per-step training.
+              </div>
+            )}
+            {form.vecEnv === "batched" && (
+              <p className="tiny muted">
+                Note: the batched NumPy backend currently always plays a random opponent and ignores the
+                selection above.
+              </p>
+            )}
           </fieldset>
 
           <label className="form-wide">

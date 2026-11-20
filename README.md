@@ -81,7 +81,7 @@ tetrisrl/
   tests/         pytest suite
 configs/         experiment configurations
 scripts/         benchmarking and experiment orchestration
-docs/            RULESET, ARCHITECTURE, BENCHMARKS, EXPERIMENTS, REPRODUCIBILITY, DASHBOARD
+docs/            RULESET, ARCHITECTURE, BENCHMARKS, ENGINE_RESEARCH, EXPERIMENTS, REPRODUCIBILITY, DASHBOARD
 results/         SQLite DB, runs, checkpoints, replays, logs (git-ignored)
 ```
 
@@ -127,7 +127,9 @@ artefacts. Executed results (tables, confidence intervals, learning curves) are 
   "last action was a rotation" spin condition is reconstructed from geometry.
 * External engines (Cold Clear, etc.) are used as placement suggesters only —
   the arena owns Season 2 attack/charging/garbage. Their integration status and
-  licence are documented in `docs/BENCHMARKS.md`.
+  licence are documented in `docs/BENCHMARKS.md` and `docs/ENGINE_RESEARCH.md`.
+* A nine-repository audit found no legally reusable, Season 2-complete rules
+  engine; the in-repo engine remains authoritative (`docs/ENGINE_RESEARCH.md`).
 * Long training is compute-bound; results in `docs/EXPERIMENTS.md` reflect the
   actual budgets executed on this machine.
 

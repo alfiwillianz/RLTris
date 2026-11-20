@@ -35,6 +35,11 @@ Live status of the TetrisRL build. Milestones follow `AGENTS.md` §18.
 - [ ] Plots (learning curves, win rates with CIs) generated from the SQLite DB.
 - [ ] Optional: self-play stage using historical checkpoints (curriculum stage 6).
 
+- [x] Engine research: nine repositories audited source-level (licences, SRS+/180,
+      Season 2 coverage, headless, RL-vs-opponent role, integration complexity).
+      See `docs/ENGINE_RESEARCH.md`; no project is both legally reusable and
+      Season 2-complete, so the in-repo engine stays authoritative.
+
 ## Known blockers / limitations
 
 - GPU driver required a reboot after a failed suspend/resume (`-EIO` on device open);

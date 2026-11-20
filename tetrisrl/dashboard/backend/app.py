@@ -150,6 +150,7 @@ dev server proxies <code>/api</code> and <code>/ws</code> to port 8000.</p>
 # ---------------------------------------------------------------------------
 class StartRunRequest(BaseModel):
     algorithm: str = Field(..., min_length=1, max_length=32)
+    resume_checkpoint: Optional[str] = None
     config: Dict[str, Any] = Field(default_factory=dict)
     seed: int = 0
     notes: str = ""
@@ -948,6 +949,18 @@ def create_app(db_path: str | None = None) -> FastAPI:
             candidate = payload.config.get("timesteps", payload.config.get("total_timesteps"))
             if isinstance(candidate, (int, float)) and candidate > 0:
                 timesteps = int(candidate)
+        if payload.resume_checkpoint:
+            candidate = Path(payload.resume_checkpoint).expanduser()
+            if not candidate.is_absolute():
+                candidate = project_root() / candidate
+            try:
+                resolved = candidate.resolve()
+                resolved.relative_to(Path(artifacts).resolve())
+            except (OSError, ValueError):
+                raise HTTPException(status_code=422, detail="resume_checkpoint must live under the results root")
+            if not resolved.is_file():
+                raise HTTPException(status_code=422, detail=f"resume checkpoint not found: {payload.resume_checkpoint}")
+            argv.extend(["--resume", str(resolved)])
         if timesteps:
             argv.extend(["--timesteps", str(int(timesteps))])
         if payload.notes:

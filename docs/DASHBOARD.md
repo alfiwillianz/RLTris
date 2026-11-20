@@ -262,6 +262,11 @@ estimated-cost card:
   curriculum; a single one as a single-stage curriculum;
 * a live estimate of throughput and wall-clock training time (including
   evaluation overhead) derived from opponent latency and the chosen backend;
+* **continue from a checkpoint**: a modal lists the checkpoints matching the
+  chosen algorithm (searchable by run id/step, with step and eval-win-rate
+  badges) and passes the selected path as `resume_checkpoint`; the backend
+  validates that it is a real file under the results root, then spawns training
+  with `--resume`. The new run keeps its own id, seed, budget and metric history;
 * name and free-form experiment notes.
 
 External engines (Cold Clear, RIKU, nana, …) are selectable in the training

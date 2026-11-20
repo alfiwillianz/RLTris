@@ -93,7 +93,25 @@ export default function NewRun() {
   const [opponents, setOpponents] = useState<string[]>(["random", "heuristic"]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [resumeSpec, setResumeSpec] = useState<string | null>(null);
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumeQuery, setResumeQuery] = useState("");
   const { data: participants } = useAsync(() => api.participants(), [], 30000);
+  const resumeOptions = (participants?.checkpoints ?? []).filter(
+    (option) => option.available && (option.algorithm ?? option.id.split(":")[0]) === form.algorithm,
+  );
+  const filteredResume = useMemo(() => {
+    const needle = resumeQuery.trim().toLowerCase();
+    if (!needle) return resumeOptions.slice(0, 60);
+    return resumeOptions
+      .filter((option) =>
+        `${option.label} ${option.run_id ?? ""} ${option.timestep ?? ""}`.toLowerCase().includes(needle),
+      )
+      .slice(0, 80);
+  }, [resumeOptions, resumeQuery]);
+  const resumeOption = resumeSpec
+    ? (participants?.checkpoints ?? []).find((option) => option.id === resumeSpec)
+    : null;
 
   const externalOptions: OpponentMeta[] = useMemo(
     () =>
@@ -174,6 +192,7 @@ export default function NewRun() {
         timesteps,
         name: form.name || undefined,
         notes: form.notes,
+        resume_checkpoint: resumeSpec ? resumeSpec.slice(resumeSpec.indexOf(":") + 1) : undefined,
         config: {
           timesteps,
           n_envs: Number(form.nEnvs) || 8,
@@ -253,7 +272,14 @@ export default function NewRun() {
               <div className="form-grid">
                 <label>
                   Algorithm
-                  <select value={form.algorithm} onChange={(event) => setForm({ ...form, algorithm: event.target.value })}>
+                  <select
+                    value={form.algorithm}
+                    onChange={(event) => {
+                      const algorithm = event.target.value;
+                      setForm({ ...form, algorithm });
+                      if (resumeSpec && !resumeSpec.startsWith(`${algorithm}:`)) setResumeSpec(null);
+                    }}
+                  >
                     <option value="ppo">PPO</option>
                     <option value="dqn">Double DQN</option>
                   </select>
@@ -298,6 +324,29 @@ export default function NewRun() {
                     <option value="batched">Batched NumPy (random opponent)</option>
                   </select>
                 </label>
+              </div>
+              <div className="resume-row">
+                <div>
+                  <div className="resume-title">Continue from a checkpoint</div>
+                  <div className="tiny muted">
+                    Load weights from an earlier run and keep this run's own id, budget and metrics.
+                  </div>
+                </div>
+                {resumeOption ? (
+                  <div className="resume-selected">
+                    <span className="mono tiny">{resumeOption.label}</span>
+                    <button className="btn btn-sm" type="button" onClick={() => setResumeOpen(true)}>
+                      Change
+                    </button>
+                    <button className="btn btn-sm" type="button" onClick={() => setResumeSpec(null)}>
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn" type="button" onClick={() => setResumeOpen(true)}>
+                    Select checkpoint
+                  </button>
+                )}
               </div>
             </div>
 
@@ -414,6 +463,64 @@ export default function NewRun() {
           </aside>
         </div>
       </form>
+
+      {resumeOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Select checkpoint" onClick={() => setResumeOpen(false)}>
+          <div className="modal panel" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Continue from checkpoint</h2>
+                <p className="tiny muted">
+                  Showing {form.algorithm.toUpperCase()} checkpoints only. The new run records its own id,
+                  seed, budget and metrics.
+                </p>
+              </div>
+              <button className="btn" type="button" onClick={() => setResumeOpen(false)}>
+                Close
+              </button>
+            </div>
+            <input
+              className="search-input"
+              type="search"
+              autoFocus
+              placeholder="Search by run id or step…"
+              value={resumeQuery}
+              onChange={(event) => setResumeQuery(event.target.value)}
+            />
+            {filteredResume.length === 0 ? (
+              <div className="empty-note">
+                {resumeOptions.length === 0
+                  ? `No ${form.algorithm.toUpperCase()} checkpoints yet — train a run first.`
+                  : "No checkpoint matches the search."}
+              </div>
+            ) : (
+              <div className="checkpoint-grid">
+                {filteredResume.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`opponent-card${resumeSpec === option.id ? " selected" : ""}`}
+                    onClick={() => {
+                      setResumeSpec(option.id);
+                      setResumeOpen(false);
+                    }}
+                  >
+                    <span className="opponent-icon">{option.algorithm?.toUpperCase() ?? "PT"}</span>
+                    <span className="opponent-body">
+                      <span className="opponent-name">{option.label}</span>
+                      <span className="opponent-meta">
+                        <span className="tag">step {option.timestep?.toLocaleString()}</span>
+                        {option.win_rate != null && <span className="tag">win {(option.win_rate * 100).toFixed(0)}%</span>}
+                      </span>
+                    </span>
+                    <span className="opponent-check">{resumeSpec === option.id ? "✓" : ""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

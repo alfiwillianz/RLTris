@@ -62,6 +62,7 @@ export const api = {
     notes?: string;
     name?: string;
     timesteps?: number;
+    resume_checkpoint?: string;
   }) =>
     request<{ run: Run; spawned: boolean; error: string | null }>("/api/runs", {
       method: "POST",

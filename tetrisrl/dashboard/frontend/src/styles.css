@@ -1311,3 +1311,42 @@ main section {
 .checkpoint-grid::-webkit-scrollbar { width: 8px; }
 .checkpoint-grid::-webkit-scrollbar-thumb { background: #30363d; border-radius: 999px; }
 .empty-note { margin-top: 0.4rem; }
+
+/* Resume-from-checkpoint */
+.resume-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed #30363d;
+}
+.resume-title { font-size: 0.86rem; font-weight: 600; }
+.resume-selected { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 8, 12, 0.68);
+  backdrop-filter: blur(3px);
+  animation: fade-up 0.18s ease both;
+}
+.modal {
+  width: min(760px, calc(100vw - 2rem));
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  border-color: #3b4a5c;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  animation: pop-in 0.2s ease both;
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+.modal-header h2 { margin: 0 0 0.15rem; }

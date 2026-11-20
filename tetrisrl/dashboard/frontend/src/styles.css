@@ -512,7 +512,12 @@ p {
 .btn:hover:not(:disabled) {
   border-color: var(--accent);
   background: #1c202a;
+  transform: translateY(-1px);
   text-decoration: none;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .btn:disabled {
@@ -1078,17 +1083,20 @@ label.check input {
   background: var(--bg-inset);
   color: inherit;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .opponent-card:hover:not(:disabled) {
+  transform: translateY(-2px);
   border-color: var(--border-strong);
   background: var(--bg-soft);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 
 .opponent-card.selected {
   border-color: var(--accent);
   background: rgba(34, 211, 238, 0.06);
+  animation: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .opponent-card.unavailable {
@@ -1430,5 +1438,104 @@ label.check input {
 
   .board-svg {
     max-width: 220px;
+  }
+}
+
+/* --------------------------------------------------------- motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.97);
+  }
+  70% {
+    transform: scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scan-pulse {
+  0%, 100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+main section {
+  animation: fade-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.step-card {
+  animation: fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.step-card:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.step-card:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.status {
+  animation: pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.warning-banner {
+  animation: fade-up 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.estimate-hero {
+  animation: pop-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.estimate-meter-fill {
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: scan-pulse 2.2s ease-in-out infinite;
+}
+
+.opponent-check {
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.opponent-card.selected .opponent-check {
+  transform: scale(1.05);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(3px);
+  animation: fade-up 0.16s ease both;
+}
+
+.modal {
+  animation: pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.dot-ok {
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

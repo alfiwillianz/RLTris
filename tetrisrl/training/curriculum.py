@@ -63,6 +63,10 @@ class MixedOpponent(BaseAgent):
 def build_opponent(stage: Stage, seed: int) -> Any:
     if stage.opponent in ("none", "solo", ""):
         return None
+    if stage.opponent in ("variant", "variants"):
+        from ..agents.variants import VariantOpponent
+
+        return VariantOpponent(seed=seed)
     if stage.opponent == "mixed":
         return MixedOpponent(stage.opponents or ["random", "heuristic", "search"], seed=seed)
     return make_agent(stage.opponent, seed=seed)

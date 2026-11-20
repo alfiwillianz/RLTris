@@ -44,7 +44,11 @@ to exploit the penalty (early self-termination is a known failure mode).
 
 ### C. Single vs mixed opponents
 `configs/single_heuristic.json` trains only against the heuristic; 
-`configs/mixed_opponents.json` samples random/heuristic/search per episode.
+`configs/mixed_opponents.json` samples random/heuristic/search per episode, plus
+`variant`: a parameterised in-repo opponent that resamples jittered heuristic
+weights / evaluation noise / beam width / lookahead depth per episode
+(`tetrisrl/agents/variants.py`). Variants are seeded, so mixed training and
+replays stay reproducible.
 Both are evaluated against all three, including the unseen opponent, to measure
 generalisation.
 

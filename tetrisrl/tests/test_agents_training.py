@@ -136,3 +136,35 @@ def test_experiment_manager_persistence(tmp_path):
     m2 = ExperimentManager(str(db))
     assert m2.get_run(rid)["algorithm"] == "ppo"
     assert m2.overview()["total_timesteps"] == 20
+
+
+def test_variant_opponent_is_legal_and_seeded():
+    from tetrisrl.agents.variants import VariantOpponent, sample_variant, build_variant
+    import random
+
+    rng = random.Random(4)
+    specs = [sample_variant(rng) for _ in range(8)]
+    assert len({s.kind for s in specs}) >= 1
+    assert len({(s.depth, s.beam_width, round(s.attack_weight, 3)) for s in specs}) > 1
+
+    a = VariantOpponent(seed=9)
+    b = VariantOpponent(seed=9)
+    a.reset(11)
+    b.reset(11)
+    assert a.current_spec == b.current_spec
+
+    variant = VariantOpponent(seed=2)
+    variant.reset(5)
+    state = GameState(seed=6)
+    for _ in range(25):
+        action = variant.choose_action(state, None)
+        assert action in state.legal_actions()
+        state.apply_action(action)
+        if state.finished:
+            break
+
+    spec = sample_variant(random.Random(1))
+    built = build_variant(spec, seed=3)
+    built.reset(3)
+    state = GameState(seed=9)
+    assert built.choose_action(state, None) in state.legal_actions()

@@ -52,7 +52,8 @@
       "opponents": [
         "random",
         "heuristic",
-        "search"
+        "search",
+        "variant"
       ],
       "max_pieces": 300
     }

@@ -9,6 +9,7 @@ from .heuristic_agent import HeuristicAgent, HeuristicWeights
 from .policy_agent import PolicyAgent
 from .random_agent import RandomAgent
 from .search_agent import BeamSearchAgent
+from .variants import VariantOpponent, build_variant, sample_variant
 
 __all__ = [
     "Agent",
@@ -18,6 +19,9 @@ __all__ = [
     "HeuristicWeights",
     "BeamSearchAgent",
     "PolicyAgent",
+    "VariantOpponent",
+    "sample_variant",
+    "build_variant",
     "make_agent",
 ]
 
@@ -25,7 +29,8 @@ __all__ = [
 def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
     """Create an agent from a spec string.
 
-    ``random``, ``heuristic``, ``search``, ``ppo:<checkpoint>``, ``dqn:<checkpoint>``.
+    ``random``, ``heuristic``, ``search``, ``variant``, ``coldclear``,
+    ``ppo:<checkpoint>``, ``dqn:<checkpoint>``.
     """
     spec = spec.strip()
     if spec == "random":
@@ -34,6 +39,8 @@ def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
         return HeuristicAgent(seed=seed, **kwargs)
     if spec in ("search", "beam"):
         return BeamSearchAgent(seed=seed, **kwargs)
+    if spec in ("variant", "variants"):
+        return VariantOpponent(seed=seed)
     if spec == "coldclear":
         # External engine: the adapter ignores our RNG seed (the engine is a
         # separate process with its own search).

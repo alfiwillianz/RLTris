@@ -340,7 +340,8 @@ PY
 .venv/bin/python scripts/run_riku_match.py --games 2 --max-pieces 120 --opponent heuristic random
 
 # 5. The whole test suite must stay green
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest
+# observed: 194 passed in 13.02s
 ```
 
 Environment override: `TETRISRL_RIKU_BIN=/path/to/tetris-core`. Optional

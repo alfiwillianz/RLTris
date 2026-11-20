@@ -1,0 +1,94 @@
+{
+  "algorithm": "dqn",
+  "seed": 0,
+  "timesteps": 150000,
+  "n_envs": 8,
+  "vec_env": "dummy",
+  "max_pieces": 300,
+  "preview": 5,
+  "include_opponent": true,
+  "ruleset": "tetrio_s2",
+  "rollout_steps": 256,
+  "learning_starts": 2000,
+  "eval_interval": 50000,
+  "eval_matches": 12,
+  "eval_opponents": [
+    "random",
+    "heuristic"
+  ],
+  "checkpoint_interval": 25000,
+  "log_interval": 12000,
+  "reward": {
+    "per_line": 2.0,
+    "per_extra_line": 1.0,
+    "tetris_bonus": 5.0,
+    "spin_bonus": 3.0,
+    "mini_spin_bonus": 1.0,
+    "perfect_clear_bonus": 8.0,
+    "per_attack_line": 2.0,
+    "per_cancelled_line": 1.5,
+    "per_received_line": -1.0,
+    "b2b_maintained": 0.3,
+    "combo_bonus_per_level": 0.1,
+    "surge_bonus": 3.0,
+    "per_piece": 0.1,
+    "terminal_win": 30.0,
+    "terminal_loss": -30.0,
+    "terminal_draw": 0.0,
+    "height_increase": -0.03,
+    "height_decrease": 0.02,
+    "hole_created": -0.5,
+    "hole_removed": 0.25,
+    "bumpiness_increase": -0.02,
+    "bumpiness_decrease": 0.01,
+    "max_height_threshold": 13,
+    "max_height_penalty": -0.1
+  },
+  "curriculum": [
+    {
+      "name": "stage1_survival",
+      "timesteps": 40000,
+      "opponent": "none",
+      "max_pieces": 200
+    },
+    {
+      "name": "stage2_random",
+      "timesteps": 50000,
+      "opponent": "random",
+      "max_pieces": 300
+    },
+    {
+      "name": "stage3_heuristic",
+      "timesteps": 60000,
+      "opponent": "heuristic",
+      "max_pieces": 300
+    }
+  ],
+  "ppo": {
+    "lr": 0.0003,
+    "entropy_coef": 0.01,
+    "epochs": 4,
+    "minibatch_size": 256,
+    "hidden_sizes": [
+      256,
+      256
+    ]
+  },
+  "notes": "",
+  "dqn": {
+    "lr": 0.0001,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.02,
+    "epsilon_decay_steps": 120000,
+    "batch_size": 256,
+    "buffer_size": 150000,
+    "target_sync_steps": 2000,
+    "learning_starts": 2000,
+    "train_freq": 1,
+    "hidden_sizes": [
+      256,
+      256
+    ],
+    "double": true
+  }
+}

@@ -1,0 +1,12 @@
+# Core runtime
+numpy>=1.26
+torch>=2.2            # install the CUDA build for your driver; see README
+PyYAML>=6.0
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+
+# Testing / analysis
+pytest>=8.0
+matplotlib>=3.8
+httpx2>=0.1          # Starlette TestClient HTTP transport

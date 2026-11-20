@@ -1,0 +1,86 @@
+{
+  "algorithm": "ppo",
+  "seed": 7,
+  "timesteps": 1000000,
+  "n_envs": 8,
+  "vec_env": "dummy",
+  "max_pieces": 400,
+  "preview": 5,
+  "include_opponent": true,
+  "ruleset": "tetrio_s2",
+  "rollout_steps": 512,
+  "learning_starts": 2000,
+  "eval_interval": 100000,
+  "eval_matches": 12,
+  "eval_opponents": [
+    "random",
+    "heuristic",
+    "search"
+  ],
+  "checkpoint_interval": 50000,
+  "log_interval": 20000,
+  "reward": {
+    "per_line": 3.0,
+    "per_extra_line": 1.5,
+    "tetris_bonus": 6.0,
+    "spin_bonus": 4.0,
+    "mini_spin_bonus": 1.0,
+    "perfect_clear_bonus": 10.0,
+    "per_attack_line": 2.0,
+    "per_cancelled_line": 1.5,
+    "per_received_line": -1.0,
+    "b2b_maintained": 0.5,
+    "combo_bonus_per_level": 0.2,
+    "surge_bonus": 4.0,
+    "per_piece": 0.15,
+    "terminal_win": 40.0,
+    "terminal_loss": -40.0,
+    "terminal_draw": 0.0,
+    "height_increase": -0.03,
+    "height_decrease": 0.02,
+    "hole_created": -0.5,
+    "hole_removed": 0.25,
+    "bumpiness_increase": -0.02,
+    "bumpiness_decrease": 0.01,
+    "max_height_threshold": 13,
+    "max_height_penalty": -0.1
+  },
+  "ppo": {
+    "lr": 0.0005,
+    "entropy_coef": 0.003,
+    "epochs": 8,
+    "minibatch_size": 128,
+    "hidden_sizes": [
+      256,
+      256
+    ],
+    "clip_ratio": 0.2,
+    "gae_lambda": 0.95,
+    "normalize_advantage": true
+  },
+  "curriculum": [
+    {
+      "name": "long_stage1_random",
+      "timesteps": 200000,
+      "opponent": "random",
+      "max_pieces": 300
+    },
+    {
+      "name": "long_stage2_heuristic",
+      "timesteps": 400000,
+      "opponent": "heuristic",
+      "max_pieces": 400
+    },
+    {
+      "name": "long_stage3_mixed",
+      "timesteps": 400000,
+      "opponent": "mixed",
+      "opponents": [
+        "random",
+        "heuristic",
+        "search"
+      ],
+      "max_pieces": 400
+    }
+  ]
+}

@@ -56,10 +56,44 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 ALGORITHM_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
 BUILTIN_PARTICIPANTS = ("random", "heuristic", "search")
-EXTERNAL_PARTICIPANTS = ("coldclear",)
+EXTERNAL_PARTICIPANTS = ("coldclear", "riku", "coldclear1", "blockfish")
+
+
+def _engine_status(spec: str) -> Dict[str, Any]:
+    """Availability of an external opponent adapter without spawning it."""
+    try:
+        if spec == "coldclear":
+            from ...agents.opponents import coldclear_available, coldclear_binary_path
+
+            available = bool(coldclear_available())
+            path = str(coldclear_binary_path())
+        elif spec == "riku":
+            from ...agents.opponents.riku import riku_available, riku_binary_path
+
+            available = bool(riku_available())
+            path = str(riku_binary_path())
+        elif spec == "coldclear1":
+            from ...agents.opponents.coldclear1 import coldclear1_available, coldclear1_binary_path
+
+            available = bool(coldclear1_available())
+            path = str(coldclear1_binary_path())
+        elif spec == "blockfish":
+            from ...agents.opponents.blockfish import blockfish_available, blockfish_binary_path
+
+            available = bool(blockfish_available())
+            path = str(blockfish_binary_path())
+        else:
+            return {"available": False, "path": None, "error": f"unknown engine {spec!r}"}
+    except Exception as exc:
+        return {"available": False, "path": None, "error": f"{type(exc).__name__}: {exc}"}
+    return {"available": available, "path": path, "error": None}
 
 
 def _coldclear_status() -> Dict[str, Any]:
+    return _engine_status("coldclear")
+
+
+def _unused_coldclear_status() -> Dict[str, Any]:
     """Return Cold Clear 2 availability without importing heavy modules."""
     try:
         from ...agents.opponents import coldclear_available, coldclear_binary_path
@@ -313,6 +347,24 @@ def _load_external_agent(spec: str, limitations: List[str]) -> Optional[Any]:
 
 def _build_agent(spec: str, limitations: List[str]) -> Any:
     spec = (spec or "").strip()
+    if spec in EXTERNAL_PARTICIPANTS:
+        status = _engine_status(spec)
+        if not status["available"]:
+            limitations.append(
+                f"{spec}: engine unavailable; falling back to a heuristic agent "
+                f"({status['error'] or 'missing built binary'})"
+            )
+            return _FallbackHeuristicAgent()
+        agents_module = _import_first(["tetrisrl.agents"])
+        factory = getattr(agents_module, "make_agent", None) if agents_module is not None else None
+        if callable(factory):
+            try:
+                return factory(spec)
+            except Exception as exc:
+                limitations.append(f"{spec}: adapter failed to start ({type(exc).__name__}: {exc})")
+                return _FallbackHeuristicAgent()
+        limitations.append(f"{spec}: tetrisrl.agents.make_agent unavailable; using heuristic")
+        return _FallbackHeuristicAgent()
     if spec == "coldclear":
         status = _coldclear_status()
         if not status["available"]:
@@ -370,6 +422,10 @@ def _participant_limitations(participants: Sequence[str]) -> List[str]:
                     f"{spec}: no checkpoint agent factory available; "
                     "tournament will fall back to a built-in heuristic agent"
                 )
+        elif spec in EXTERNAL_PARTICIPANTS:
+            status = _engine_status(spec)
+            if not status["available"]:
+                limitations.append(f"{spec}: engine unavailable; fallback heuristic agent will be used")
         elif spec == "coldclear":
             status = _coldclear_status()
             if not status["available"]:
@@ -1167,6 +1223,27 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 "kind": "external",
                 "available": bool(coldclear["available"]),
                 "detail": coldclear["path"] if coldclear["available"] else "engine binary not built",
+            },
+            {
+                "id": "riku",
+                "label": "RIKU tetris-ai (TBP)",
+                "kind": "external",
+                "available": bool(_engine_status("riku")["available"]),
+                "detail": _engine_status("riku")["path"] or "engine not built",
+            },
+            {
+                "id": "coldclear1",
+                "label": "Cold Clear 1 (C ABI, garbage-aware)",
+                "kind": "external",
+                "available": bool(_engine_status("coldclear1")["available"]),
+                "detail": _engine_status("coldclear1")["path"] or "engine not built",
+            },
+            {
+                "id": "blockfish",
+                "label": "Blockfish (cheese specialist, not versus)",
+                "kind": "external",
+                "available": bool(_engine_status("blockfish")["available"]),
+                "detail": _engine_status("blockfish")["path"] or "engine not built",
             },
             {"id": "random", "label": "Random legal placement", "kind": "baseline", "available": True, "detail": None},
             {"id": "heuristic", "label": "Handcrafted heuristic", "kind": "baseline", "available": True, "detail": None},

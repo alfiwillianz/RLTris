@@ -61,6 +61,12 @@ def test_binary_path_env_override(monkeypatch, tmp_path):
     assert not blockfish_available(missing)
 
 
+def test_agent_metadata_labels_cheese_specialist():
+    assert BlockfishAgent.specialist == "cheese"
+    assert BlockfishAgent.is_versus_benchmark is False
+    assert BlockfishAgent.not_a_versus_benchmark is True
+
+
 # ---------------------------------------------------------------------------
 # Board / snapshot mapping
 # ---------------------------------------------------------------------------

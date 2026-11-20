@@ -30,7 +30,8 @@ def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
     """Create an agent from a spec string.
 
     ``random``, ``heuristic``, ``search``, ``variant``, ``coldclear``,
-    ``ppo:<checkpoint>``, ``dqn:<checkpoint>``.
+    ``riku``, ``coldclear1``, ``blockfish`` (specialist), ``ppo:<checkpoint>``,
+    ``dqn:<checkpoint>``.
     """
     spec = spec.strip()
     if spec == "random":
@@ -41,6 +42,21 @@ def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
         return BeamSearchAgent(seed=seed, **kwargs)
     if spec in ("variant", "variants"):
         return VariantOpponent(seed=seed)
+    if spec == "riku":
+        from .opponents.riku import RikuAgent
+
+        kwargs.pop("seed", None)
+        return RikuAgent(**kwargs)
+    if spec == "coldclear1":
+        from .opponents.coldclear1 import ColdClear1Agent
+
+        kwargs.pop("seed", None)
+        return ColdClear1Agent(**kwargs)
+    if spec == "blockfish":
+        from .opponents.blockfish import BlockfishAgent
+
+        kwargs.pop("seed", None)
+        return BlockfishAgent(**kwargs)
     if spec == "coldclear":
         # External engine: the adapter ignores our RNG seed (the engine is a
         # separate process with its own search).

@@ -1,4 +1,4 @@
-# TetrisRL Architecture
+# RLTris Architecture
 
 Status: **living document**. Interfaces marked *(frozen)* must not change without
 coordinating every module that depends on them.

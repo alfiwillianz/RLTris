@@ -4,7 +4,7 @@
 **Verification date:** 2026-11-20.
 **Author:** Opponent Researcher (subagent).
 **Scope:** discover and verify open-source Tetris AI engines usable as local versus
-opponents for TetrisRL under TETR.IO Season 2 / SRS+ mechanics, and specify a genuine
+opponents for RLTris under TETR.IO Season 2 / SRS+ mechanics, and specify a genuine
 search-based in-repo baseline in case no external engine is usable offline.
 
 ---
@@ -313,7 +313,7 @@ Legend: ✅ documented/implemented · ⚠️ partial or claim-only · ❌ no · 
   `crates/bot` and accepting AGPL. Its own arena could host our bot only if our bot
   spoke its TBP dialect and we accepted the license boundary.
 * **Verdict: REJECT as a dependency.** AGPL-3.0-only is incompatible with keeping
-  TetrisRL permissively licensed, and the project is too new/unvetted to be an
+  RLTris permissively licensed, and the project is too new/unvetted to be an
   authority. **However:** its S2 documentation is a useful cross-check for
   `docs/RULESET.md` (read it, do not copy AGPL text), and its "1–50 vs Attax" result
   is a useful calibration point: an honest S2 beam bot is currently far from the
@@ -502,7 +502,7 @@ incoming garbage per move — which is why it is the top pick.
 
 ## 5. Licensing summary and consequences
 
-| License | Projects | What it means for TetrisRL |
+| License | Projects | What it means for RLTris |
 |---|---|---|
 | **MIT / Apache-2.0 / BSD-3** | Cold Clear 2 (MIT OR Apache), frostetra, RIKU0804, Zetris repo, Quadspace, s2-bot-lab, minorail | Safe to depend on, vendor, or reimplement with attribution. Keep `NOTICE`/copyright. |
 | **MPL-2.0** | Cold Clear 1 | File-level copyleft. Safe as a separate process or unmodified library; if we patch Cold Clear files, publish those files. Our repo can stay MIT. |

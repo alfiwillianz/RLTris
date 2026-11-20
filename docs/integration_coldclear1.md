@@ -28,7 +28,7 @@ receive, not only garbage already on its board.
 | Build | `cargo build --release -p c-api` → succeeded in 32.48 s (warnings, no errors) |
 | Library | `third_party/cold-clear/target/release/libcold_clear.so`, 1,531,360 bytes, SHA-256 `189bf1233b60de12b6553dcf914907c77a16f4fa01e28a5d7c25059953753892` |
 | Crate layout | `c-api/Cargo.toml`: `[lib] name = "cold_clear"`, `crate-type = ["cdylib", "staticlib"]` |
-| Integration mode | **Dynamic linking only** (`ctypes.CDLL`); no Cold Clear source copied into TetrisRL |
+| Integration mode | **Dynamic linking only** (`ctypes.CDLL`); no Cold Clear source copied into RLTris |
 | ABI | `cc_launch_with_board_async`, `cc_request_next_move`, `cc_poll_next_move`, `cc_reset_async`, `cc_destroy_async`, `CCMove`, `CCWeights`, `CCOptions` |
 | Adapter | `tetrisrl/agents/opponents/coldclear1.py` (`ColdClear1Agent`, `name = "coldclear1"`) |
 | Runner | `scripts/run_coldclear1_match.py` |
@@ -36,7 +36,7 @@ receive, not only garbage already on its board.
 | Real matches | **30 games**: 20 at 20k nodes and 10 at 60k nodes (details §7) |
 | Garbage-aware evidence | Pending garbage changed the suggestion in **29/212** (13.7%) and **19/190** (10.0%) probed decisions |
 | Fallbacks | 0/1603 accepted decisions at 20k; 1/1411 at 60k (0.07%) |
-| Engine's role | **Placement suggester only.** TetrisRL owns attack, garbage, cancellation, B2B charging, Surge and top-out. |
+| Engine's role | **Placement suggester only.** RLTris owns attack, garbage, cancellation, B2B charging, Surge and top-out. |
 
 **What this is not:** it is not a Season 2 model inside Cold Clear. The engine
 receives a garbage *count*, not a queue; it has no Surge/charge concept, no

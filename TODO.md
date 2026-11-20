@@ -1,6 +1,6 @@
 # TODO / project status
 
-Live status of the TetrisRL build. Milestones follow `AGENTS.md` §18.
+Live status of the RLTris build. Milestones follow `AGENTS.md` §18.
 
 ## Completed
 

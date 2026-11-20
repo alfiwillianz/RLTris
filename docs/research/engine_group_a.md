@@ -1,6 +1,6 @@
 # Engine Group A — source-level audit
 
-Scope: three candidate engines/opponents for TetrisRL (TETR.IO Season 2, SRS+, 10×40 board).
+Scope: three candidate engines/opponents for RLTris (TETR.IO Season 2, SRS+, 10×40 board).
 Method: read-only inspection of repository trees via the GitHub API, then `raw.githubusercontent.com`
 for README/LICENSE/Cargo/`src` files. **Nothing was cloned, built, installed, or run.** Any statement
 about "builds on Linux" is therefore an inference from manifests, not an observed build.
@@ -190,7 +190,7 @@ Headless by construction — there is no renderer, window, or asset dependency. 
 
 There is no `main.rs`, no CLI, no server, no TBP.
 
-### Role for TetrisRL
+### Role for RLTris
 
 **RL environment candidate — and only that.** It is a rules engine, not a player: it has no evaluation
 function, no search policy, and no way to choose a move (BFS enumerates legal placements and their
@@ -211,7 +211,7 @@ group to a drop-in TETR.IO-shaped environment: seeded 7-bag, placement-level `ex
 ### Integration complexity: **MEDIUM**
 
 Technically the shortest path is `maturin develop --release` and calling the PyO3 class from Python; all
-of TetrisRL's engine-facing needs (board occupancy, 7-bag, spins, attack, garbage timers, cancellation)
+of RLTris's engine-facing needs (board occupancy, 7-bag, spins, attack, garbage timers, cancellation)
 are already exposed as dicts. But you would have to write: (a) your own versus loop and garbage
 scheduling on top of `resolve_outgoing_attack`/`surge_segments`, because the engine has no clock and no
 opponent; (b) your own lock-delay reset cap and gravity curve, because the only timing helper
@@ -230,17 +230,17 @@ licence problem is solved, which is a legal blocker, not an engineering one.
   (every non-T spin is forced to mini). Treat documented claims as unverified marketing until tested.
 - Exact Python pin `==3.13.12` will bite CI.
 
-### What this means for TetrisRL
+### What this means for RLTris
 
 This is the most attractive *rules* engine in the group and the most legally dangerous artifact in it.
 Its architecture (placement-level `execute_placement`, seeded bag, per-clear `AttackStats`, garbage
-timers, BFS action enumeration, clutch clear) is close to what TetrisRL's `environment/` needs, which
+timers, BFS action enumeration, clutch clear) is close to what RLTris's `environment/` needs, which
 makes it tempting to vendor — and that is precisely what must not happen: with no licence, copying even
 a helper function into an MIT repository is a copyright problem, and a subprocess wrapper does not cure
 it because you would still be redistributing the code. The realistic uses are (1) an external,
 never-distributed oracle for *behavioural* comparison while developing our own ruleset (install it
 locally, diff outputs, write down the deltas), and (2) a source of design ideas to re-implement
-clean-room. If TetrisRL wants a Rust engine, the honest options are to write it ourselves or to build on
+clean-room. If RLTris wants a Rust engine, the honest options are to write it ourselves or to build on
 Cold Clear's `libtetris` (MPL-2.0, §3), whose tables are at least licensed. Note also that even a
 perfect copy would not give us SRS+: the I-kick table here is guideline SRS, so any Season 2 claim built
 on this engine would be wrong in exactly the situations the task cares about.
@@ -365,7 +365,7 @@ Protocol (all `type`-tagged, `snake_case`) [VERIFIED: `src/tbp.rs`]:
 - Handshake subtlety: `start` with empty `hold` and empty `queue` is buffered until the first
   `new_piece`.
 
-### Role for TetrisRL
+### Role for RLTris
 
 **Opponent / placement oracle only.** It is a genuine competitive search bot (DAG/transposition tree
 over a 2–4 piece lookahead, hand-tuned weights) and it is trivially subprocess-ready. It is *not* an RL
@@ -403,7 +403,7 @@ score it with our own attack table), which is an approximation, not parity.
   copyright notice and (if Apache-2.0 applies and you modify files) the NOTICE file.
 - Stale dependency pins; wasm/`cdylib` build path is unmaintained.
 
-### What this means for TetrisRL
+### What this means for RLTris
 
 The cheapest legitimate opponent we can have: MIT/Apache, no GPU, one JSON-lines subprocess, and a
 search that is genuinely strong at stacking. It is also the clearest illustration of the compatibility
@@ -527,7 +527,7 @@ mechanics than Cold Clear 2 — but it is a **2020–2022, pre-Season-2** model.
   not an RL interface [VERIFIED].
 - GUI: `cc-client` (desktop/web) — avoid for training.
 
-### Role for TetrisRL
+### Role for RLTris
 
 **Opponent (primary) and reference versus implementation (secondary); not an RL environment.** It is a
 strong, genuinely competitive search bot with a C ABI, and it is the only one in this group with a
@@ -573,7 +573,7 @@ internal model is boolean-B2B, additive-combo, guideline-kicks, 2021 attack valu
   under the OFL (`cc-client/res/LICENSE_OFL.txt`) — irrelevant for engine use but easy to drag in by
   accident.
 
-### What this means for TetrisRL
+### What this means for RLTris
 
 This is the best *opponent* in the group and the best *documentation of a versus loop* we can legally
 read: `battle/src/game.rs` shows a complete gravity/lock-delay/15-move-rule/garbage-cancel/top-out
@@ -598,7 +598,7 @@ Short answer: **one of the three cannot be used at all; the other two can, with 
 | `cold-clear-2` | MIT OR Apache-2.0 | No | No (keep copyright/attribution; Apache NOTICE if applicable) | Anything: dynamic/static link, subprocess, vendored crate, copied file with notice. |
 | `cold-clear` | MPL-2.0 | **No** — §3.3 explicitly allows a Larger Work under other terms | **Yes, in effect**: copied files stay MPL-2.0 and must not be relicensed as MIT | Link (dynamic preferred), or subprocess/TBP. If any MPL file is copied or modified, keep it MPL with notices and publish its source. Do **not** paste MPL code into MIT-licensed files. |
 
-Practical rule for TetrisRL (MIT): treat `tetris-engine-in-rust` as **read-only, never-distributed
+Practical rule for RLTris (MIT): treat `tetris-engine-in-rust` as **read-only, never-distributed
 reference**; integrate `cold-clear-2` as an external subprocess or a properly-attributed dependency; and
 integrate `cold-clear` as a **subprocess or dynamic library** with an MPL notice file, never by copying
 its `piece.rs`/`game.rs` into our tree. A subprocess boundary is the safest default for both Cold Clears

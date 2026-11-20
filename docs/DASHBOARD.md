@@ -1,6 +1,6 @@
 # Dashboard
 
-The dashboard is a persistent local Web UI for the TetrisRL project. It answers
+The dashboard is a persistent local Web UI for the RLTris project. It answers
 questions after (and during) long training sessions: what ran, how the metrics
 evolved, which checkpoints exist, how algorithms compare, what the latest
 tournament did, and what actually happened in a match.
@@ -137,7 +137,7 @@ No checkpoint → HTTP 400. Already running → HTTP 409.
 `/ws/training` is a best-effort broadcast channel:
 
 ```json
-{"type": "hello", "message": "TetrisRL live training feed", "version": "0.1.0"}
+{"type": "hello", "message": "RLTris live training feed", "version": "0.1.0"}
 {"type": "metric", "run_id": "...", "timestep": 1234, "metrics": {"train/loss": 0.4, "...": 0.0}}
 {"type": "run_status", "run_id": "...", "status": "running"}
 ```

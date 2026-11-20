@@ -5,7 +5,7 @@ frostetra release build was launched as a subprocess, completed the SBP
 handshake, and returned placements that the adapter mapped to legal actions in
 20 real versus matches. It beat the in-repo heuristic **10-0** and random
 **10-0** (paired seeds 0-9, 300-piece cap). The engine only suggests placements:
-TetrisRL owns the board, attack, garbage, cancellation, B2B charging and Surge.
+RLTris owns the board, attack, garbage, cancellation, B2B charging and Surge.
 
 The integration is **experimental**. The engine is MIT-licensed and advertises
 SRS+/180, but its exact rotation-table parity with our ruleset is not fully

@@ -1,4 +1,4 @@
-# TetrisRL — Competitive RL Arena (TETR.IO Season 2)
+# RLTris — Competitive RL Arena (TETR.IO Season 2)
 
 A reproducible research platform for asking one question:
 

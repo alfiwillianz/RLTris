@@ -71,7 +71,7 @@ licence grant**. So: "BSD-3-Clause with non-OSI and unlicensed patches" is the
 accurate characterisation. `[VERIFIED]` for the cited files; full inventory
 `[UNKNOWN]` (no clone).
 
-Practical consequence: **do not copy any NullpoMino code into TetrisRL.**
+Practical consequence: **do not copy any NullpoMino code into RLTris.**
 Subprocess execution is the only clean mode, and even that would require
 distributing the LGPL natives and non-free assets if we shipped it.
 
@@ -215,7 +215,7 @@ and `README.md` has no licence section; GitHub's licence metadata could not be
 queried because the REST API was rate-limited. Under default copyright, the **spec
 text is not licensed for reuse**. The *protocol* (message names, JSON shape) is
 a functional interface and can be implemented independently, but do not copy
-prose, tables, or the README into TetrisRL docs; write our own description and
+prose, tables, or the README into RLTris docs; write our own description and
 link to the spec. `[VERIFIED]` absence; legal characterisation `[INFERRED]`.
 
 Related: the Rust `tbp` crate (separate repo `tbp-rs`, used by battletris) is
@@ -474,7 +474,7 @@ placements (`movegen` in `game.rs:199-378`).
 | Option | Detail |
 |---|---|
 | Subprocess (as referee) | Build the binary, provide two TBP-speaking bot executables; use its score/SPRT output. Requires implementing a TBP bot wrapper around our agent if we want our policy in it. `[VERIFIED]` interface |
-| Subprocess (as opponent harness) | It is *not* an opponent; it only plays bots against each other. To use TBP bots as opponents in TetrisRL we would implement our own TBP host (see §3.6), not depend on battletris |
+| Subprocess (as opponent harness) | It is *not* an opponent; it only plays bots against each other. To use TBP bots as opponents in RLTris we would implement our own TBP host (see §3.6), not depend on battletris |
 | Protocol/API | JSON lines to bots, CLI to user; no library API, no replay output, no machine-readable results beyond stdout `"W - L"` |
 | Linking/copying | **No** — unlicensed, and non-deterministic |
 
@@ -532,7 +532,7 @@ Confidence tags apply to the cell.
 
 ---
 
-## 6. What this means for TetrisRL
+## 6. What this means for RLTris
 
 **None of the three repos can be the Season 2 engine, and none can be an RL
 environment.** Two of them (NullpoMino, battletris) are real simulations, but
@@ -584,7 +584,7 @@ be presented as TETR.IO S2 evidence.
 |---|---|---|---|
 | NullpoMino | No integration; optional behavioural reference | HIGH (if ever attempted) | GUI-only, mixed licence, non-TETR.IO tables |
 | TBP bots (via spec) | In-repo Python **TBP frontend** adapter + subprocess bots | LOW (client) / MEDIUM (host) | Small stable schema; placement-based; no code copying; must document S2 gaps |
-| TetrisRL as TBP bot | Thin TBP **bot wrapper** around `choose_action()` | LOW | Useful for external evaluation; state is our own |
+| RLTris as TBP bot | Thin TBP **bot wrapper** around `choose_action()` | LOW | Useful for external evaluation; state is our own |
 | battletris | Optional external referee for TBP-bot-vs-TBP-bot smoke tests | MEDIUM | Unlicensed; non-deterministic; PPT rules only |
 
 **Licence-safe modes, explicitly:** subprocess/protocol only; no linking, no

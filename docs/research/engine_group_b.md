@@ -1,6 +1,6 @@
 # Engine Group B — Source-Level Audit
 
-**Scope:** three third-party Tetris engines/bots considered as opponents or references for TetrisRL
+**Scope:** three third-party Tetris engines/bots considered as opponents or references for RLTris
 (TETR.IO Season 2, SRS+).
 
 | # | Repository | Audited commit |
@@ -10,7 +10,7 @@
 | 3 | <https://github.com/blockfish/blockfish> | `739953f9331b7648f269fc52cff5aae330108ccd` (`HEAD`) |
 
 **Method.** Read-only audit. No clone, build, install, or modification of any external repository; no
-code copied into TetrisRL. Repo trees were read through the GitHub trees API, then individual files
+code copied into RLTris. Repo trees were read through the GitHub trees API, then individual files
 through `raw.githubusercontent.com`. Licenses were read as full text, not inferred from metadata.
 Activity dates come from each repo's `commits/HEAD.atom` feed because the REST metadata endpoint
 returned **HTTP 403 (rate limit)** — star counts and the `archived` flag are therefore [UNKNOWN].
@@ -51,7 +51,7 @@ claim cites a file and symbol/function instead of an invented line.
 | Season 2 attack table | No | No | No |
 | Garbage in/out | Pending queue, cancel, ≤8/turn | Incoming only, cancel-first, ≤8/turn | Incoming cheese only |
 | Integration surface | TBP JSON-over-stdio subprocess | localhost HTTP + keyboard injection | protobuf-over-stdio subprocess |
-| Role for TetrisRL | reference + approx. sparring opponent | **disqualified** dependency | cheese/downstack specialist |
+| Role for RLTris | reference + approx. sparring opponent | **disqualified** dependency | cheese/downstack specialist |
 | Complexity | **MEDIUM** | **HIGH** | **MEDIUM** (cheese mode only) |
 
 ---
@@ -195,7 +195,7 @@ I/O centre ambiguity adds a small correctness trap.
 maintenance signal; but the code is small and self-contained, so risk is mostly "unmaintained", not
 "hostile". Archived status [UNKNOWN] (metadata 403).
 
-### 1.9 What this means for TetrisRL
+### 1.9 What this means for RLTris
 
 tetris-ai is the most *compatible* of the three in spirit — MIT, Rust, headless, genuinely
 search-based (beam search over all reachable placements, including tucks and spin slots) — but its
@@ -324,7 +324,7 @@ unverifiable glue for a bot whose rules can't be inspected.
 
 **Risks (material):**
 
-- **Not permissible under this project's own rules.** TetrisRL's AGENTS.md forbids depending on a
+- **Not permissible under this project's own rules.** RLTris's AGENTS.md forbids depending on a
   closed-source implementation; the search core here is a prebuilt binary with no license text in the
   repo. [VERIFIED absence of third-party license files]
 - The repository includes **Windows kernel-mode driver binaries** (`ScpVBus.sys`) and installer EXEs.
@@ -335,7 +335,7 @@ unverifiable glue for a bot whose rules can't be inspected.
 - BSD-3 covers *this* code, but the bundled binaries are **license-unknown** [UNKNOWN]; the mirror is a
   single unreviewed commit.
 
-### 2.9 What this means for TetrisRL
+### 2.9 What this means for RLTris
 
 ZetrisV2 is the only one of the three that actually turns on SRS+ and 180 — and that is exactly why it
 is tempting and exactly why it must be rejected. The flags are visible, but the tables are inside a
@@ -473,7 +473,7 @@ versus opponent at all.
 `log 0.4.8`) are old; `protoc-rust` requires a matching `protoc`. No security issues observed in the
 audited files. Archived status [UNKNOWN]; last commit 2025-07.
 
-### 3.9 What this means for TetrisRL
+### 3.9 What this means for RLTris
 
 Blockfish is a high-quality, genuinely search-based downstacking engine, and that is precisely the
 scope to use it in. It is **not** a general versus benchmark and must never be reported as one: its
@@ -523,7 +523,7 @@ an unreadable binary or unresolved.
 
 No license here *forbids* linking in the absolute sense, but the obligations differ sharply:
 
-| Repo | License | Link/embed into MIT? | Copy code into MIT repo? | Safe mode for TetrisRL |
+| Repo | License | Link/embed into MIT? | Copy code into MIT repo? | Safe mode for RLTris |
 |---|---|---|---|---|
 | tetris-ai | MIT | Yes, with copyright + permission notice | Yes, with notice (but we are not copying) | subprocess (TBP); notice if ever vendored |
 | ZetrisV2 | BSD-3-Clause (own code) | Yes, with copyright + conditions + no-endorsement | Yes, with notice | **subprocess only, and only if the binary problem is solved — not recommended** |
@@ -551,7 +551,7 @@ built later, must live behind a subprocess boundary and carry the upstream licen
 
 ---
 
-## 6. Cross-cutting conclusions for TetrisRL
+## 6. Cross-cutting conclusions for RLTris
 
 1. **None of the three is a Season 2 engine.** All three lack B2B charging, Surge, the Season 2 attack
    table, and All-Mini+. Only ZetrisV2 even claims SRS+/180, and it does so through a closed binary we

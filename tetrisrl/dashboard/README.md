@@ -1,4 +1,4 @@
-# TetrisRL Dashboard
+# RLTris Dashboard
 
 Persistent local Web UI for training runs, algorithm comparison, round-robin
 tournaments, and deterministic match replays.

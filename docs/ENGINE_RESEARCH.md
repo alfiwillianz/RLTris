@@ -190,3 +190,39 @@ Implement a **Python TBP frontend/host** in our repo:
 * No external engine was built or executed during this research except the
   already-documented Cold Clear 2 integration. RIKU remains unbuilt until the
   adapter task starts.
+
+---
+
+## 6. Addendum — `iclyxcly/MisaMino` (fork) assessment
+
+Evaluated after the nine-repo audit; source inspected via a throwaway clone in
+`/tmp` (nothing copied into this repository).
+
+* **Identity:** a fork of `misakamm/MisaMino` ("forked from misakamm/MisaMino"
+  on GitHub), with commits from 2021–2023 adding a TETR.IO attack table
+  (`tetris_setting.h: TETRIO_ATTACK_TABLE 1`), 180° rotation
+  (`tetris.h::trySpin180`), T-spin mini fixes, garbage/ping handling,
+  adjustable preview and infinity hold.
+* **Licence:** `LICENSE` is still the upstream 21-byte
+  `Copyleft by Misakamm` — **non-OSI, no grant text**. All rights reserved; no
+  linking, embedding, vendoring or code copying. Even for a course project this
+  is not an appropriate dependency.
+* **Mechanics:** MisaMino's classic wall-kick tables (`gamefield.h`,
+  4 tests after the implicit basic rotation, separate I table); **guideline
+  ordering, not SRS+** — the I-piece test order differs from TETR.IO. 180° is a
+  **basic rotation with no kick tests** (`trySpin180` fails on collision), not
+  the TETR.IO directional 180 table. T-spin/mini heuristics exist
+  (`wallkick_spin` 1 = spin, 2 = mini) but there is no All-Mini+ and no Season 2
+  attack model: the added "TETR.IO attack table" is the Season 1-style table,
+  and there is no B2B charging, Surge, surge segmentation or Season 2 garbage
+  speed/cap.
+* **Platform:** Windows-only C++ (`.vcxproj`, EGE/graphics `.lib`, DirectX-era
+  toolchain). `tetris_ai/main.cpp` is a GUI game; `dllai/` is the classic
+  MisaMino Windows DLL AI interface (`TetrisAI_t`), not a line protocol. No
+  headless mode, no Linux build, no TBP/SBP/JSON interface.
+* **Role:** reference-only. It cannot serve as an RL environment (state lives in
+  the DLL/GUI), and as an opponent it would require a Windows/Wine process plus a
+  custom DLL bridge for a non-OSI binary — high effort with no redistribution
+  rights.
+* **Verdict: REJECT for integration; read-only reference.** Use the in-repo
+  variants / RIKU / Cold Clear engines for opponent diversity instead.

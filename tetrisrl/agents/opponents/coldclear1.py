@@ -44,7 +44,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..base import BaseAgent
 from ..heuristic_agent import HeuristicAgent
@@ -452,9 +452,11 @@ class ColdClear1Stats:
     engine_dead: int = 0
     nodes_total: int = 0
     answer_latency_ms: float = 0.0
+    incoming_searches: int = 0
     garbage_probes: int = 0
     garbage_probe_differences: int = 0
     garbage_probe_errors: int = 0
+    probe_searches: int = 0
     last_incoming: int = 0
     last_move: Dict[str, Any] = field(default_factory=dict)
     last_error: str = ""
@@ -581,6 +583,8 @@ class ColdClear1Agent(BaseAgent):
             return -1
         incoming = max(0, int(state.pending_garbage))
         self.stats.last_incoming = incoming
+        if incoming > 0:
+            self.stats.incoming_searches += 1
         try:
             if self._closed:
                 raise ColdClear1Unavailable("agent was terminated; call reset() first")
@@ -663,6 +667,7 @@ class ColdClear1Agent(BaseAgent):
     def _probe_garbage_effect(self, state: GameState, move: ColdClear1Move, incoming: int) -> None:
         """Measure whether the pending-garbage count changes the suggestion."""
         self.stats.garbage_probes += 1
+        self.stats.probe_searches += 1
         try:
             baseline = self._search(state, 0)
         except Exception as exc:
@@ -671,6 +676,9 @@ class ColdClear1Agent(BaseAgent):
             return
         if set(baseline.cells) != set(move.cells) or bool(baseline.hold) != bool(move.hold):
             self.stats.garbage_probe_differences += 1
+        # The probe is a measurement; ``last_move`` must describe the move we
+        # actually returned, not the counterfactual search.
+        self.stats.last_move = move.to_dict()
 
 
 __all__ = [

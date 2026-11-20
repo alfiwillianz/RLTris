@@ -328,6 +328,10 @@ class RikuAgent(TBPAgent):
             name=name or type(self).name,
         )
         self.weights = riku_weights_path(weights)
+        if weights is not None and self.weights is None:
+            raise FileNotFoundError(
+                f"RIKU weights file not found: {Path(weights).expanduser()}"
+            )
 
     # -- launch -----------------------------------------------------------
     def _launch_command(self) -> List[str]:

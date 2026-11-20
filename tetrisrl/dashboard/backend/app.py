@@ -56,7 +56,7 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 ALGORITHM_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
 BUILTIN_PARTICIPANTS = ("random", "heuristic", "search")
-EXTERNAL_PARTICIPANTS = ("coldclear", "riku", "coldclear1", "blockfish")
+EXTERNAL_PARTICIPANTS = ("coldclear", "riku", "coldclear1", "hikari", "blockfish")
 
 
 def _engine_status(spec: str) -> Dict[str, Any]:
@@ -72,6 +72,11 @@ def _engine_status(spec: str) -> Dict[str, Any]:
 
             available = bool(riku_available())
             path = str(riku_binary_path())
+        elif spec == "hikari":
+            from ...agents.opponents.hikari import hikari_available, hikari_binary_path
+
+            available = bool(hikari_available())
+            path = str(hikari_binary_path())
         elif spec == "coldclear1":
             from ...agents.opponents.coldclear1 import coldclear1_available, coldclear1_binary_path
 
@@ -1237,6 +1242,13 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 "kind": "external",
                 "available": bool(_engine_status("coldclear1")["available"]),
                 "detail": _engine_status("coldclear1")["path"] or "engine not built",
+            },
+            {
+                "id": "hikari",
+                "label": "Hikari (TBP, 24-row board)",
+                "kind": "external",
+                "available": bool(_engine_status("hikari")["available"]),
+                "detail": _engine_status("hikari")["path"] or "engine not built",
             },
             {
                 "id": "blockfish",

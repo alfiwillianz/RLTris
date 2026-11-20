@@ -52,6 +52,11 @@ def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
 
         kwargs.pop("seed", None)
         return ColdClear1Agent(**kwargs)
+    if spec == "hikari":
+        from .opponents.hikari import HikariAgent
+
+        kwargs.pop("seed", None)
+        return HikariAgent(**kwargs)
     if spec == "blockfish":
         from .opponents.blockfish import BlockfishAgent
 

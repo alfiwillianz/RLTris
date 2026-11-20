@@ -1283,3 +1283,31 @@ main section {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Tournament builder */
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 9px;
+  border: 1px solid #30363d;
+  background: #0f141a;
+  color: #e6edf3;
+  margin-bottom: 0.7rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.search-input:focus {
+  outline: none;
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+.checkpoint-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.checkpoint-grid::-webkit-scrollbar { width: 8px; }
+.checkpoint-grid::-webkit-scrollbar-thumb { background: #30363d; border-radius: 999px; }
+.empty-note { margin-top: 0.4rem; }

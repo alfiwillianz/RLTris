@@ -275,6 +275,17 @@ selection because it always plays a random opponent. The form posts
 `{algorithm, seed, timesteps, notes, config}`, and the backend persists the run
 before spawning the supervised training process.
 
+## Tournament builder
+
+`/tournaments/new` mirrors the run builder: engine cards (with availability)
+for external engines and in-repo baselines, plus a searchable checkpoint
+picker (filter by run id, algorithm, step or path; cards show algorithm, step
+and eval win rate). Selected participants appear as chips in a sticky line-up
+card that computes the scheduled match count (`C(n,2) × seeds`). Submission
+posts the same `{name, participants, seeds, max_pieces}` payload the API
+already accepts; `ppo:<path>` / `dqn:<path>` specs load through the policy
+agent. The Tournaments list page now only shows history and deletion.
+
 ## 5. Replay format and viewer
 
 Each frame contains, per side, the 40-row occupancy bitmask, the active piece, hold/next,

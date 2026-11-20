@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import Checkpoints from "./pages/Checkpoints";
 import Compare from "./pages/Compare";
 import NewRun from "./pages/NewRun";
+import NewTournament from "./pages/NewTournament";
 import NotFound from "./pages/NotFound";
 import Overview from "./pages/Overview";
 import ReplayViewer from "./pages/ReplayViewer";
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/runs/:runId" element={<RunDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/tournaments/new" element={<NewTournament />} />
           <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
           <Route path="/replays" element={<Replays />} />
           <Route path="/replays/:matchId" element={<ReplayViewer />} />

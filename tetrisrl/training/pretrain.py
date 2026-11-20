@@ -36,7 +36,11 @@ from .curriculum import Stage
 def _pretrain_opts(cfg) -> Dict[str, Any]:
     data = dict(cfg.pretrain or {})
     data.setdefault("epochs", 10)
-    data.setdefault("matches_per_epoch", 8)
+    if "matches_per_pair" not in data:
+        # Backwards compatibility: an explicit matches_per_epoch is spread
+        # evenly over the pairings; otherwise default to 2 per pair.
+        data["matches_per_pair"] = 0 if data.get("matches_per_epoch") else 2
+    data.setdefault("matches_per_epoch", 0)
     data.setdefault("bc_epochs", 2)
     data.setdefault("batch_size", 256)
     data.setdefault("lr", 3e-4)
@@ -62,7 +66,10 @@ def _collect_demos(
 ) -> Tuple[List[np.ndarray], List[int], List[np.ndarray], Dict[str, float]]:
     opts = _pretrain_opts(cfg)
     specs = list(opts["opponents"])
-    matches = int(opts["matches_per_epoch"])
+    pairs = list(itertools.combinations(specs, 2)) or [(specs[0], specs[0])]
+    per_pair = int(opts.get("matches_per_pair") or 0)
+    if per_pair <= 0:  # backwards compatibility with matches_per_epoch
+        per_pair = max(1, math.ceil(int(opts.get("matches_per_epoch") or len(pairs) * 2) / len(pairs)))
     max_pieces = int(opts["max_pieces"])
     ruleset = load_ruleset(cfg.ruleset)
     observations: List[np.ndarray] = []
@@ -70,47 +77,50 @@ def _collect_demos(
     masks: List[np.ndarray] = []
     stats = {"matches": 0, "draws": 0, "wins": 0, "pieces": 0}
 
-    for i in range(matches):
-        spec_a, spec_b = _pair(specs, i)
-        seed = (cfg.seed * 1_000_003 + epoch * 10_007 + i * 97) & 0x7FFFFFFF
-        match = VersusMatch(
-            make_agent(spec_a, seed=seed),
-            make_agent(spec_b, seed=seed + 1),
-            ruleset=ruleset,
-            seed=seed,
-            max_pieces=max_pieces,
-            record_frames=False,
-            record_events=True,
-        )
-        result = match.run()
-        stats["matches"] += 1
-        if result.winner is None:
-            stats["draws"] += 1
-            continue
-        winner = result.winner
-        stats["wins"] += 1
-        stats["pieces"] += result.ticks
-        side = "a" if winner == 0 else "b"
-        ticks = result.replay["ticks"]
-        sa, sb, ga, gb = derive_seeds(seed)
-        state_a = GameState(ruleset, seed=sa, garbage_seed=ga, player_id=0, max_pieces=max_pieces)
-        state_b = GameState(ruleset, seed=sb, garbage_seed=gb, player_id=1, max_pieces=max_pieces)
-        for tick in ticks:
-            own = state_a if side == "a" else state_b
-            other = state_b if side == "a" else state_a
-            action = int(tick[side].get("action", -1))
-            if action >= 0 and not own.finished:
-                observations.append(encoder.encode(own, other))
-                masks.append(np.asarray(own.action_mask(), dtype=bool))
-                actions.append(action)
-            res_a = state_a.apply_action(int(tick["a"]["action"]))
-            res_b = state_b.apply_action(int(tick["b"]["action"]))
-            if res_a.sent > 0:
-                state_b.receive_attack(res_a.sent)
-            if res_b.sent > 0:
-                state_a.receive_attack(res_b.sent)
-            if state_a.finished or state_b.finished:
-                break
+    match_index = 0
+    for pair_index, (spec_a, spec_b) in enumerate(pairs):
+        for repeat in range(per_pair):
+            i = pair_index * per_pair + repeat
+            match_index += 1
+            seed = (cfg.seed * 1_000_003 + epoch * 10_007 + i * 97) & 0x7FFFFFFF
+            match = VersusMatch(
+                make_agent(spec_a, seed=seed),
+                make_agent(spec_b, seed=seed + 1),
+                ruleset=ruleset,
+                seed=seed,
+                max_pieces=max_pieces,
+                record_frames=False,
+                record_events=True,
+            )
+            result = match.run()
+            stats["matches"] += 1
+            if result.winner is None:
+                stats["draws"] += 1
+                continue
+            winner = result.winner
+            stats["wins"] += 1
+            stats["pieces"] += result.ticks
+            side = "a" if winner == 0 else "b"
+            ticks = result.replay["ticks"]
+            sa, sb, ga, gb = derive_seeds(seed)
+            state_a = GameState(ruleset, seed=sa, garbage_seed=ga, player_id=0, max_pieces=max_pieces)
+            state_b = GameState(ruleset, seed=sb, garbage_seed=gb, player_id=1, max_pieces=max_pieces)
+            for tick in ticks:
+                own = state_a if side == "a" else state_b
+                other = state_b if side == "a" else state_a
+                action = int(tick[side].get("action", -1))
+                if action >= 0 and not own.finished:
+                    observations.append(encoder.encode(own, other))
+                    masks.append(np.asarray(own.action_mask(), dtype=bool))
+                    actions.append(action)
+                res_a = state_a.apply_action(int(tick["a"]["action"]))
+                res_b = state_b.apply_action(int(tick["b"]["action"]))
+                if res_a.sent > 0:
+                    state_b.receive_attack(res_a.sent)
+                if res_b.sent > 0:
+                    state_a.receive_attack(res_b.sent)
+                if state_a.finished or state_b.finished:
+                    break
     return observations, actions, masks, stats
 
 
@@ -168,7 +178,7 @@ def train_pretrain(cfg, ctx: RunContext, agent=None) -> None:
     state = ctx.load_training_state() if ctx.resume_checkpoint else {"step": 0}
     start_epoch = int(state.get("step", 0))
     epochs = int(opts["epochs"])
-    print(f"[pretrain] {cfg.algorithm} epochs={epochs} matches/epoch={opts['matches_per_epoch']} opponents={opts['opponents']}", flush=True)
+    print(f"[pretrain] {cfg.algorithm} epochs={epochs} matches/pair/epoch={opts['matches_per_pair']} opponents={opts['opponents']}", flush=True)
 
     for epoch_index in range(start_epoch, epochs):
         if ctx.stop_requested:

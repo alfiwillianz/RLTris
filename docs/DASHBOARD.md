@@ -265,7 +265,7 @@ estimated-cost card:
 * **run mode**: from scratch (normal RL), continue (fine-tune from a
   checkpoint) or pretrain (behaviour cloning). In pretrain mode the opponent
   cards define a per-epoch demonstration tournament; fields change to epochs,
-  matches per epoch (dataset size), cloning passes and batch size, and the
+  matches per pair per epoch (dataset size), cloning passes and batch size, and the
   dashboard labels the run's budget as **epochs** instead of timesteps;
 * **continue from a checkpoint**: a modal lists the checkpoints matching the
   chosen algorithm (searchable by run id/step, with step and eval-win-rate

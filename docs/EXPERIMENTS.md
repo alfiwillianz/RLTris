@@ -109,8 +109,8 @@ checkpoint index. Ablations differ only in the dimension named above.
 
 `mode: "pretrain"` collects demonstrations instead of running RL:
 
-1. each epoch runs a mini round robin between the selected opponents with
-   epoch-derived seeds (fresh games every epoch);
+1. each epoch runs every pairing `matches_per_pair` times (fresh epoch-derived
+   seeds), so each epoch adds `pairings x matches_per_pair` games;
 2. only the **winning side's** `(observation, action, mask)` trajectories are
    kept — losses and draws are discarded;
 3. the PPO actor (or DQN Q-network) is trained with masked cross-entropy for

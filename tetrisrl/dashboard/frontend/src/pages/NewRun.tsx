@@ -93,7 +93,7 @@ export default function NewRun() {
   const [mode, setMode] = useState<"rl" | "continue" | "pretrain">("rl");
   const [pretrain, setPretrain] = useState({
     epochs: "10",
-    matches: "8",
+    matchesPerPair: "2",
     bcEpochs: "2",
     batchSize: "256",
   });
@@ -153,16 +153,19 @@ export default function NewRun() {
       : 0;
     if (isPretrain) {
       const epochs = Math.max(1, Number(pretrain.epochs) || 1);
-      const matches = Math.max(1, Number(pretrain.matches) || 1);
+      const perPair = Math.max(1, Number(pretrain.matchesPerPair) || 1);
+      const n = Math.max(1, selectedMeta.length);
+      const pairs = n < 2 ? 1 : (n * (n - 1)) / 2;
+      const matchesPerEpoch = pairs * perPair;
       const estimateTicks = 90;
-      const collect = (epochs * matches * estimateTicks * opponentMs) / 1000;
+      const collect = (epochs * matchesPerEpoch * estimateTicks * opponentMs) / 1000;
       const bc = epochs * Math.max(1, Number(pretrain.bcEpochs) || 1) * 1.5;
       return {
-        stepsPerSec: (epochs * matches) / Math.max(1, collect + bc),
+        stepsPerSec: (epochs * matchesPerEpoch) / Math.max(1, collect + bc),
         trainSeconds: collect,
         evalSeconds: bc,
         totalSeconds: collect + bc,
-        throughputText: `${matches} matches/epoch`,
+        throughputText: `${matchesPerEpoch} matches/epoch · ${pairs} pairing${pairs === 1 ? "" : "s"}`,
         timestepLabel: "Epochs",
         timestepValue: epochs,
       };
@@ -182,7 +185,7 @@ export default function NewRun() {
       timestepLabel: "Timesteps",
       timestepValue: timesteps,
     };
-  }, [form.timesteps, form.nEnvs, form.vecEnv, selectedMeta, isPretrain, pretrain.epochs, pretrain.matches, pretrain.bcEpochs]);
+  }, [form.timesteps, form.nEnvs, form.vecEnv, selectedMeta, isPretrain, pretrain.epochs, pretrain.matchesPerPair, pretrain.bcEpochs]);
 
   const toggleOpponent = (id: string) => {
     setOpponents((current) => {
@@ -214,9 +217,9 @@ export default function NewRun() {
     }
     if (isPretrain) {
       const epochs = Number(pretrain.epochs);
-      const matches = Number(pretrain.matches);
-      if (!Number.isFinite(epochs) || epochs < 1 || !Number.isFinite(matches) || matches < 1) {
-        setFormError("Epochs and matches per epoch must be positive integers.");
+      const perPair = Number(pretrain.matchesPerPair);
+      if (!Number.isFinite(epochs) || epochs < 1 || !Number.isFinite(perPair) || perPair < 1) {
+        setFormError("Epochs and matches per pair must be positive integers.");
         return;
       }
     }
@@ -241,7 +244,7 @@ export default function NewRun() {
             seed: Number(form.seed) || 0,
             pretrain: {
               epochs: Number(pretrain.epochs) || 1,
-              matches_per_epoch: Number(pretrain.matches) || 1,
+              matches_per_pair: Number(pretrain.matchesPerPair) || 1,
               bc_epochs: Number(pretrain.bcEpochs) || 1,
               batch_size: Number(pretrain.batchSize) || 256,
               opponents,
@@ -333,7 +336,7 @@ export default function NewRun() {
                 {[
                   { id: "rl", title: "From scratch", blurb: "Standard RL against the chosen opponents." },
                   { id: "continue", title: "Continue", blurb: "Fine-tune from a saved checkpoint." },
-                  { id: "pretrain", title: "Pretrain (BC)", blurb: "Tournament demos → winner-only cloning." },
+                  { id: "pretrain", title: "Pretrain (BC)", blurb: "Pairwise demos → winner-only cloning." },
                 ].map((option) => (
                   <button
                     key={option.id}
@@ -397,12 +400,12 @@ export default function NewRun() {
                       />
                     </label>
                     <label>
-                      Matches per epoch (dataset)
+                      Matches per pair per epoch
                       <input
                         type="number"
                         min={1}
-                        value={pretrain.matches}
-                        onChange={(event) => setPretrain({ ...pretrain, matches: event.target.value })}
+                        value={pretrain.matchesPerPair}
+                        onChange={(event) => setPretrain({ ...pretrain, matchesPerPair: event.target.value })}
                       />
                     </label>
                     <label>

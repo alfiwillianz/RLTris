@@ -56,7 +56,7 @@ DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 ALGORITHM_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
 BUILTIN_PARTICIPANTS = ("random", "heuristic", "search")
-EXTERNAL_PARTICIPANTS = ("coldclear", "riku", "coldclear1", "nana", "hikari", "blockfish")
+EXTERNAL_PARTICIPANTS = ("coldclear", "riku", "coldclear1", "nana", "hikari", "frostetra", "blockfish")
 
 
 def _engine_status(spec: str) -> Dict[str, Any]:
@@ -72,6 +72,11 @@ def _engine_status(spec: str) -> Dict[str, Any]:
 
             available = bool(riku_available())
             path = str(riku_binary_path())
+        elif spec == "frostetra":
+            from ...agents.opponents.frostetra import frostetra_available, frostetra_binary_path
+
+            available = bool(frostetra_available())
+            path = str(frostetra_binary_path())
         elif spec == "nana":
             from ...agents.opponents.nana import nana_available, nana_binary_path
 
@@ -1260,6 +1265,13 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 "kind": "external",
                 "available": bool(_engine_status("coldclear1")["available"]),
                 "detail": _engine_status("coldclear1")["path"] or "engine not built",
+            },
+            {
+                "id": "frostetra",
+                "label": "frostetra (SBP, SRS+/180 claim)",
+                "kind": "external",
+                "available": bool(_engine_status("frostetra")["available"]),
+                "detail": _engine_status("frostetra")["path"] or "engine not built",
             },
             {
                 "id": "nana",

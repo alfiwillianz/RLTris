@@ -52,6 +52,11 @@ def make_agent(spec: str, seed: int = 0, **kwargs: Any) -> Any:
 
         kwargs.pop("seed", None)
         return ColdClear1Agent(**kwargs)
+    if spec == "frostetra":
+        from .opponents.frostetra import FrostetraAgent
+
+        kwargs.pop("seed", None)
+        return FrostetraAgent(**kwargs)
     if spec == "nana":
         from .opponents.nana import NanaAgent
 

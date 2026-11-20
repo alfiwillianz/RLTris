@@ -20,9 +20,10 @@ export interface ChartSeries {
 interface MetricChartProps {
   series: ChartSeries[];
   height?: number;
+  xLabel?: string;
 }
 
-export default function MetricChart({ series, height = 320 }: MetricChartProps) {
+export default function MetricChart({ series, height = 320, xLabel = "step" }: MetricChartProps) {
   const rowsByName = new Map<number, Record<string, number | string>>();
   series.forEach((item, index) => {
     const dataKey = `s${index}`;
@@ -66,7 +67,7 @@ export default function MetricChart({ series, height = 320 }: MetricChartProps) 
             }}
             labelStyle={{ color: "#edf0f5", marginBottom: 4 }}
             itemStyle={{ color: "#cbd5e1", padding: "1px 0" }}
-            labelFormatter={(value) => `step ${formatTimesteps(Number(value))}`}
+            labelFormatter={(value) => `${xLabel} ${formatTimesteps(Number(value))}`}
             formatter={(value: number | string, name: string) => [formatMetric(Number(value), 4), name]}
           />
           <Legend wrapperStyle={{ fontSize: 11, fontFamily: "var(--mono)", color: "#7c8496" }} />

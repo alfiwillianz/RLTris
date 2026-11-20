@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 def _add_common_train_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--algorithm", choices=["ppo", "dqn"])
+    p.add_argument("--mode", choices=["rl", "pretrain"], default=None)
     p.add_argument("--config", type=str, default=None, help="YAML/JSON training config")
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--timesteps", type=int, default=None)
@@ -95,6 +96,8 @@ def cmd_train(args) -> int:
     config = TrainConfig.load(args.config) if args.config else TrainConfig()
     if args.algorithm:
         config.algorithm = args.algorithm
+    if args.mode:
+        config.mode = args.mode
     if args.seed is not None:
         config.seed = args.seed
     if args.timesteps is not None:

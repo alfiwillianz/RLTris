@@ -90,6 +90,13 @@ export default function NewRun() {
     name: "",
     notes: "",
   });
+  const [mode, setMode] = useState<"rl" | "continue" | "pretrain">("rl");
+  const [pretrain, setPretrain] = useState({
+    epochs: "10",
+    matches: "8",
+    bcEpochs: "2",
+    batchSize: "256",
+  });
   const [opponents, setOpponents] = useState<string[]>(["random", "heuristic"]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -136,6 +143,7 @@ export default function NewRun() {
   const selectedMeta = opponents.map((id) => allOptions.find((option) => option.id === id)).filter(Boolean) as OpponentMeta[];
   const selectedExternal = selectedMeta.filter((option) => option.group === "external");
 
+  const isPretrain = mode === "pretrain";
   const estimate = useMemo(() => {
     const timesteps = Number(form.timesteps) || 0;
     const nEnvs = Math.max(1, Number(form.nEnvs) || 1);
@@ -143,14 +151,38 @@ export default function NewRun() {
     const opponentMs = selectedMeta.length
       ? selectedMeta.reduce((sum, option) => sum + option.msPerMove, 0) / selectedMeta.length
       : 0;
+    if (isPretrain) {
+      const epochs = Math.max(1, Number(pretrain.epochs) || 1);
+      const matches = Math.max(1, Number(pretrain.matches) || 1);
+      const estimateTicks = 90;
+      const collect = (epochs * matches * estimateTicks * opponentMs) / 1000;
+      const bc = epochs * Math.max(1, Number(pretrain.bcEpochs) || 1) * 1.5;
+      return {
+        stepsPerSec: (epochs * matches) / Math.max(1, collect + bc),
+        trainSeconds: collect,
+        evalSeconds: bc,
+        totalSeconds: collect + bc,
+        throughputText: `${matches} matches/epoch`,
+        timestepLabel: "Epochs",
+        timestepValue: epochs,
+      };
+    }
     let stepsPerSec = 1000 / Math.max(0.1, agentMs + opponentMs);
     if (form.vecEnv === "subprocess") stepsPerSec *= Math.min(nEnvs, 8) * 0.85;
     if (form.vecEnv === "batched") stepsPerSec = 1800;
     const trainSeconds = timesteps / stepsPerSec;
     const evaluations = Math.floor(timesteps / 50000);
     const evalSeconds = evaluations * 25;
-    return { stepsPerSec, trainSeconds, evalSeconds, totalSeconds: trainSeconds + evalSeconds };
-  }, [form.timesteps, form.nEnvs, form.vecEnv, selectedMeta]);
+    return {
+      stepsPerSec,
+      trainSeconds,
+      evalSeconds,
+      totalSeconds: trainSeconds + evalSeconds,
+      throughputText: `${Math.round(stepsPerSec).toLocaleString()} steps/s`,
+      timestepLabel: "Timesteps",
+      timestepValue: timesteps,
+    };
+  }, [form.timesteps, form.nEnvs, form.vecEnv, selectedMeta, isPretrain, pretrain.epochs, pretrain.matches, pretrain.bcEpochs]);
 
   const toggleOpponent = (id: string) => {
     setOpponents((current) => {
@@ -176,9 +208,17 @@ export default function NewRun() {
     event.preventDefault();
     setFormError(null);
     const timesteps = Number(form.timesteps);
-    if (!Number.isFinite(timesteps) || timesteps < 1) {
+    if (!isPretrain && (!Number.isFinite(timesteps) || timesteps < 1)) {
       setFormError("Timesteps must be a positive integer.");
       return;
+    }
+    if (isPretrain) {
+      const epochs = Number(pretrain.epochs);
+      const matches = Number(pretrain.matches);
+      if (!Number.isFinite(epochs) || epochs < 1 || !Number.isFinite(matches) || matches < 1) {
+        setFormError("Epochs and matches per epoch must be positive integers.");
+        return;
+      }
     }
     if (opponents.length === 0) {
       setFormError("Pick at least one opponent (or Solo / survival).");
@@ -186,20 +226,40 @@ export default function NewRun() {
     }
     setSubmitting(true);
     try {
-      const response = await api.startRun({
+      const base = {
         algorithm: form.algorithm,
         seed: Number(form.seed) || 0,
-        timesteps,
         name: form.name || undefined,
         notes: form.notes,
-        resume_checkpoint: resumeSpec ? resumeSpec.slice(resumeSpec.indexOf(":") + 1) : undefined,
-        config: {
-          timesteps,
-          n_envs: Number(form.nEnvs) || 8,
-          vec_env: form.vecEnv,
-          max_pieces: Number(form.maxPieces) || 300,
-          curriculum: buildCurriculum(),
-        },
+        resume_checkpoint:
+          mode === "continue" && resumeSpec ? resumeSpec.slice(resumeSpec.indexOf(":") + 1) : undefined,
+      };
+      const config = isPretrain
+        ? {
+            mode: "pretrain",
+            max_pieces: Number(form.maxPieces) || 300,
+            seed: Number(form.seed) || 0,
+            pretrain: {
+              epochs: Number(pretrain.epochs) || 1,
+              matches_per_epoch: Number(pretrain.matches) || 1,
+              bc_epochs: Number(pretrain.bcEpochs) || 1,
+              batch_size: Number(pretrain.batchSize) || 256,
+              opponents,
+              max_pieces: Number(form.maxPieces) || 300,
+              eval_every: Math.max(1, Math.round((Number(pretrain.epochs) || 1) / 4)),
+            },
+          }
+        : {
+            timesteps,
+            n_envs: Number(form.nEnvs) || 8,
+            vec_env: form.vecEnv,
+            max_pieces: Number(form.maxPieces) || 300,
+            curriculum: buildCurriculum(),
+          };
+      const response = await api.startRun({
+        ...base,
+        timesteps: isPretrain ? undefined : timesteps,
+        config,
       });
       if (response.spawned) {
         navigate(`/runs/${encodeURIComponent(response.run.id)}`);
@@ -269,6 +329,23 @@ export default function NewRun() {
                   <p className="tiny muted">What to train and how far to run it.</p>
                 </div>
               </div>
+              <div className="mode-grid">
+                {[
+                  { id: "rl", title: "From scratch", blurb: "Standard RL against the chosen opponents." },
+                  { id: "continue", title: "Continue", blurb: "Fine-tune from a saved checkpoint." },
+                  { id: "pretrain", title: "Pretrain (BC)", blurb: "Tournament demos → winner-only cloning." },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`mode-card${mode === option.id ? " selected" : ""}`}
+                    onClick={() => setMode(option.id as typeof mode)}
+                  >
+                    <span className="mode-title">{option.title}</span>
+                    <span className="mode-blurb">{option.blurb}</span>
+                  </button>
+                ))}
+              </div>
               <div className="form-grid">
                 <label>
                   Algorithm
@@ -288,15 +365,17 @@ export default function NewRun() {
                   Seed
                   <input type="number" value={form.seed} onChange={(event) => setForm({ ...form, seed: event.target.value })} />
                 </label>
-                <label>
-                  Timesteps
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.timesteps}
-                    onChange={(event) => setForm({ ...form, timesteps: event.target.value })}
-                  />
-                </label>
+                {!isPretrain && (
+                  <label>
+                    Timesteps
+                    <input
+                      type="number"
+                      min={1}
+                      value={form.timesteps}
+                      onChange={(event) => setForm({ ...form, timesteps: event.target.value })}
+                    />
+                  </label>
+                )}
                 <label>
                   Max pieces per episode
                   <input
@@ -306,25 +385,69 @@ export default function NewRun() {
                     onChange={(event) => setForm({ ...form, maxPieces: event.target.value })}
                   />
                 </label>
-                <label>
-                  Parallel environments
-                  <input
-                    type="number"
-                    min={1}
-                    max={64}
-                    value={form.nEnvs}
-                    onChange={(event) => setForm({ ...form, nEnvs: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Environment backend
-                  <select value={form.vecEnv} onChange={(event) => setForm({ ...form, vecEnv: event.target.value })}>
-                    <option value="dummy">In-process (reference engine)</option>
-                    <option value="subprocess">Subprocess workers (reference engine)</option>
-                    <option value="batched">Batched NumPy (random opponent)</option>
-                  </select>
-                </label>
+                {isPretrain ? (
+                  <>
+                    <label>
+                      Epochs
+                      <input
+                        type="number"
+                        min={1}
+                        value={pretrain.epochs}
+                        onChange={(event) => setPretrain({ ...pretrain, epochs: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Matches per epoch (dataset)
+                      <input
+                        type="number"
+                        min={1}
+                        value={pretrain.matches}
+                        onChange={(event) => setPretrain({ ...pretrain, matches: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Cloning passes per epoch
+                      <input
+                        type="number"
+                        min={1}
+                        value={pretrain.bcEpochs}
+                        onChange={(event) => setPretrain({ ...pretrain, bcEpochs: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Batch size
+                      <input
+                        type="number"
+                        min={1}
+                        value={pretrain.batchSize}
+                        onChange={(event) => setPretrain({ ...pretrain, batchSize: event.target.value })}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label>
+                      Parallel environments
+                      <input
+                        type="number"
+                        min={1}
+                        max={64}
+                        value={form.nEnvs}
+                        onChange={(event) => setForm({ ...form, nEnvs: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Environment backend
+                      <select value={form.vecEnv} onChange={(event) => setForm({ ...form, vecEnv: event.target.value })}>
+                        <option value="dummy">In-process (reference engine)</option>
+                        <option value="subprocess">Subprocess workers (reference engine)</option>
+                        <option value="batched">Batched NumPy (random opponent)</option>
+                      </select>
+                    </label>
+                  </>
+                )}
               </div>
+              {mode === "continue" && (
               <div className="resume-row">
                 <div>
                   <div className="resume-title">Continue from a checkpoint</div>
@@ -348,14 +471,19 @@ export default function NewRun() {
                   </button>
                 )}
               </div>
+              )}
             </div>
 
             <div className="panel step-card">
               <div className="step-heading">
                 <span className="step-index">2</span>
                 <div>
-                  <h2>Pick opponents</h2>
-                  <p className="tiny muted">One choice → single-stage curriculum. Several → sampled per episode.</p>
+                  <h2>{isPretrain ? "Demo tournament pool" : "Pick opponents"}</h2>
+                  <p className="tiny muted">
+                    {isPretrain
+                      ? "Matches are generated from these opponents every epoch; only winning trajectories are cloned."
+                      : "One choice → single-stage curriculum. Several → sampled per episode."}
+                  </p>
                 </div>
                 <span className="selection-count">{opponents.length} selected</span>
               </div>
@@ -428,20 +556,20 @@ export default function NewRun() {
               </div>
               <div className="kv-grid estimate-kv">
                 <div>
-                  <span className="muted">Throughput</span>
-                  <div className="mono">{Math.round(estimate.stepsPerSec).toLocaleString()} steps/s</div>
+                  <span className="muted">{isPretrain ? "Dataset" : "Throughput"}</span>
+                  <div className="mono">{estimate.throughputText}</div>
                 </div>
                 <div>
                   <span className="muted">Training</span>
                   <div className="mono">{humanize(estimate.trainSeconds)}</div>
                 </div>
                 <div>
-                  <span className="muted">Evaluation overhead</span>
+                  <span className="muted">{isPretrain ? "Cloning overhead" : "Evaluation overhead"}</span>
                   <div className="mono">{humanize(estimate.evalSeconds)}</div>
                 </div>
                 <div>
-                  <span className="muted">Timesteps</span>
-                  <div className="mono">{(Number(form.timesteps) || 0).toLocaleString()}</div>
+                  <span className="muted">{estimate.timestepLabel}</span>
+                  <div className="mono">{estimate.timestepValue.toLocaleString()}</div>
                 </div>
               </div>
               <div className="estimate-opponents">

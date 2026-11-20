@@ -103,3 +103,22 @@ checkpoint index. Ablations differ only in the dimension named above.
   results characterise this budget, not an upper bound on the method.
 * External engines are placement suggesters; Season 2 attack/charge/garbage is
   always computed by our arena. See `docs/BENCHMARKS.md`.
+
+
+## Pretraining (behaviour cloning)
+
+`mode: "pretrain"` collects demonstrations instead of running RL:
+
+1. each epoch runs a mini round robin between the selected opponents with
+   epoch-derived seeds (fresh games every epoch);
+2. only the **winning side's** `(observation, action, mask)` trajectories are
+   kept — losses and draws are discarded;
+3. the PPO actor (or DQN Q-network) is trained with masked cross-entropy for
+   the configured cloning passes.
+
+Checkpoints are saved per epoch and can seed a later `continue` run. Outcomes:
+`pretrain/dataset`, `pretrain/matches`, `pretrain/draws`, `pretrain/loss`,
+`pretrain/updates`, plus periodic evaluation. Important caveat: this is
+**imitation of the strongest selected opponent, not RL**, so it cannot exceed
+the demonstrator's policy and inherits its action-space gaps (tucks/spins). It
+is a warm start, not evidence about RL's competitive ceiling.

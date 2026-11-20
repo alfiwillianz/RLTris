@@ -110,7 +110,10 @@ export default function Runs() {
                       <StatusBadge status={run.status} />
                     </td>
                     <td className="num">{run.seed ?? "—"}</td>
-                    <td className="num">{formatNumber(run.total_timesteps)}</td>
+                    <td className="num">
+                      {formatNumber(run.total_timesteps)}
+                      {(run.config as Record<string, unknown> | undefined)?.mode === "pretrain" ? " ep" : ""}
+                    </td>
                     <td className="nowrap tiny">{formatDate(run.created_at)}</td>
                     <td className="truncate" title={run.notes ?? ""}>
                       {run.notes || "—"}

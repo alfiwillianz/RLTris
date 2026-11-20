@@ -61,6 +61,8 @@ DEFAULT_CURRICULUM: List[Dict[str, Any]] = [
 @dataclass
 class TrainConfig:
     algorithm: str = "ppo"
+    #: "rl" (normal PPO/DQN training) or "pretrain" (tournament demos -> BC).
+    mode: str = "rl"
     seed: int = 0
     timesteps: int = 600_000
     n_envs: int = 8
@@ -92,6 +94,9 @@ class TrainConfig:
     curriculum: List[Dict[str, Any]] = field(default_factory=lambda: [dict(s) for s in DEFAULT_CURRICULUM])
     #: Optional override: run a single stage (empty = full curriculum).
     stage: str = ""
+    #: Pretraining settings (mode="pretrain"): tournament demos from the
+    #: listed opponents, winner trajectories only, behaviour-cloned each epoch.
+    pretrain: Dict[str, Any] = field(default_factory=dict)
     #: Extra per-run metadata copied into the DB.
     tags: List[str] = field(default_factory=list)
 

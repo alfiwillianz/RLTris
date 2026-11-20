@@ -183,7 +183,9 @@ export default function RunDetail() {
                 <div className="mono">{run.seed ?? "—"}</div>
               </div>
               <div>
-                <span className="muted">Timesteps</span>
+                <span className="muted">
+                  {(run.config as Record<string, unknown> | undefined)?.mode === "pretrain" ? "Epochs" : "Timesteps"}
+                </span>
                 <div className="mono">{formatNumber(run.total_timesteps)}</div>
               </div>
               <div>
@@ -268,7 +270,11 @@ export default function RunDetail() {
                     Clear
                   </button>
                 </div>
-                <MetricChart series={chartSeries} height={360} />
+                <MetricChart
+                  series={chartSeries}
+                  height={360}
+                  xLabel={(run?.config as Record<string, unknown> | undefined)?.mode === "pretrain" ? "epoch" : "step"}
+                />
               </>
             )}
           </div>
@@ -302,7 +308,10 @@ export default function RunDetail() {
                   <tbody>
                     {checkpointState.data.checkpoints.map((checkpoint) => (
                       <tr key={checkpoint.id}>
-                        <td className="num">{formatNumber(checkpoint.timestep)}</td>
+                        <td className="num">
+                          {formatNumber(checkpoint.timestep)}
+                          {(run.config as Record<string, unknown> | undefined)?.mode === "pretrain" ? " ep" : ""}
+                        </td>
                         <td className="num">{formatMetric(checkpoint.mean_reward)}</td>
                         <td className="num">{formatMetric(checkpoint.win_rate)}</td>
                         <td className="tiny">{formatDate(checkpoint.created_at)}</td>

@@ -262,6 +262,11 @@ estimated-cost card:
   curriculum; a single one as a single-stage curriculum;
 * a live estimate of throughput and wall-clock training time (including
   evaluation overhead) derived from opponent latency and the chosen backend;
+* **run mode**: from scratch (normal RL), continue (fine-tune from a
+  checkpoint) or pretrain (behaviour cloning). In pretrain mode the opponent
+  cards define a per-epoch demonstration tournament; fields change to epochs,
+  matches per epoch (dataset size), cloning passes and batch size, and the
+  dashboard labels the run's budget as **epochs** instead of timesteps;
 * **continue from a checkpoint**: a modal lists the checkpoints matching the
   chosen algorithm (searchable by run id/step, with step and eval-win-rate
   badges) and passes the selected path as `resume_checkpoint`; the backend

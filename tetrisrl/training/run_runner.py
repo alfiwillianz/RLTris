@@ -32,7 +32,11 @@ def run_training(
             if not Path(resume_checkpoint).exists():
                 raise FileNotFoundError(f"checkpoint not found: {resume_checkpoint}")
             agent = load_agent(resume_checkpoint, device=None if config.device in ("auto", "") else config.device)
-        if config.algorithm == "ppo":
+        if getattr(config, "mode", "rl") == "pretrain":
+            from .pretrain import train_pretrain
+
+            train_pretrain(config, ctx, agent)
+        elif config.algorithm == "ppo":
             from .train_ppo import train_ppo
 
             train_ppo(config, ctx, agent)

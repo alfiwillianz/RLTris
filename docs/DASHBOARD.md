@@ -247,6 +247,24 @@ The tournament detail response includes DB matches (with replay paths) and the
 stored standings. CSV always works: it is generated from the DB when results
 JSON is unavailable.
 
+## New run page
+
+`/runs/new` is a dedicated form (linked from the Runs header):
+
+* algorithm (PPO / Double DQN), seed, timesteps, max pieces per episode,
+  parallel environments and environment backend (in-process, subprocess,
+  batched NumPy);
+* training opponents as a multi-select (solo, random, heuristic, beam search,
+  seeded variants). Multiple opponents are recorded as a mixed-opponent
+  curriculum; a single one as a single-stage curriculum;
+* name and free-form experiment notes.
+
+External engines (Cold Clear, RIKU, nana, …) are intentionally not offered in
+the training picker: they take milliseconds to seconds per placement, so they
+belong in tournaments/evaluation where the dashboard exposes them as
+participants. The form posts `{algorithm, seed, timesteps, notes, config}`, and
+the backend persists the run before spawning the supervised training process.
+
 ## 5. Replay format and viewer
 
 Each frame contains, per side, the 40-row occupancy bitmask, the active piece, hold/next,

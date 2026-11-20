@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useAsync, useTrainingFeed } from "../hooks";
 import MetricChart from "../components/MetricChart";
@@ -33,6 +33,7 @@ function checkpointHref(checkpoint: Checkpoint, algorithm: string): string {
 }
 
 export default function RunDetail() {
+  const navigate = useNavigate();
   const { runId = "" } = useParams();
   const encoded = encodeURIComponent(runId);
   const runState = useAsync(() => api.run(runId), [runId], 3000);
@@ -137,6 +138,21 @@ export default function RunDetail() {
             disabled={busy || !run || !["running", "starting"].includes(run.status)}
           >
             Stop
+          </button>
+          <button
+            className="btn btn-danger"
+            type="button"
+            onClick={async () => {
+              if (!window.confirm(`Delete run "${runId}"? Checkpoints, replays and metrics are removed permanently.`)) return;
+              try {
+                await api.deleteRun(runId);
+                navigate("/runs");
+              } catch (err) {
+                window.alert(err instanceof Error ? err.message : String(err));
+              }
+            }}
+          >
+            Delete
           </button>
           <button
             className="btn"

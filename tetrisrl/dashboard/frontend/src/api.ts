@@ -67,6 +67,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  deleteRun: (runId: string) =>
+    request<{ deleted: boolean; removed_files: number; removed_matches: number }>(
+      `/api/runs/${encodeURIComponent(runId)}`,
+      { method: "DELETE" },
+    ),
   stopRun: (runId: string) =>
     request<{ run: Run; stop: Record<string, unknown> }>(`/api/runs/${encodeURIComponent(runId)}/stop`, {
       method: "POST",
@@ -110,6 +115,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  deleteTournament: (tournamentId: string) =>
+    request<{ deleted: boolean; removed_files: number; removed_matches: number }>(
+      `/api/tournaments/${encodeURIComponent(tournamentId)}`,
+      { method: "DELETE" },
+    ),
   tournamentCsvUrl: (tournamentId: string) => apiUrl(`/api/tournaments/${encodeURIComponent(tournamentId)}/csv`),
   replays: (limit = 200) => request<{ replays: ReplayListItem[] }>(`/api/replays?limit=${limit}`),
   replay: (matchId: string) => request<Replay>(`/api/matches/${encodeURIComponent(matchId)}/replay`),

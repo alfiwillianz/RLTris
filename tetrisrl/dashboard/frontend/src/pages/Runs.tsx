@@ -30,6 +30,24 @@ export default function Runs() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const runs = useMemo(() => data?.runs ?? [], [data]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const deleteRun = async (runId: string, status: string) => {
+    const running = ["running", "starting"].includes(status);
+    const message = running
+      ? `Stop and delete run "${runId}"? This removes its checkpoints, replays and metrics permanently.`
+      : `Delete run "${runId}"? This removes its checkpoints, replays and metrics permanently.`;
+    if (!window.confirm(message)) return;
+    setDeleting(runId);
+    try {
+      await api.deleteRun(runId);
+      refresh();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -152,12 +170,13 @@ export default function Runs() {
                   <th className="num">Timesteps</th>
                   <th>Created</th>
                   <th>Notes</th>
+                  <th className="num">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {runs.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="muted">
+                    <td colSpan={8} className="muted">
                       No runs match the current filters.
                     </td>
                   </tr>
@@ -178,6 +197,16 @@ export default function Runs() {
                     <td className="nowrap tiny">{formatDate(run.created_at)}</td>
                     <td className="truncate" title={run.notes ?? ""}>
                       {run.notes || "—"}
+                    </td>
+                    <td className="num">
+                      <button
+                        className="btn btn-danger btn-sm"
+                        type="button"
+                        disabled={deleting === run.id}
+                        onClick={() => deleteRun(run.id, run.status)}
+                      >
+                        {deleting === run.id ? "Deleting…" : "Delete"}
+                      </button>
                     </td>
                   </tr>
                 ))}

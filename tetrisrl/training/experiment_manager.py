@@ -489,3 +489,44 @@ class ExperimentManager:
             "latest_tournament": dict(latest_tournament) if latest_tournament else None,
             "latest_evaluations": latest_evals,
         }
+
+    # -- deletion ----------------------------------------------------------
+    def delete_match(self, match_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM matches WHERE id=?", (match_id,))
+            conn.commit()
+
+    def delete_run(self, run_id: str) -> Dict[str, Any]:
+        """Delete a run's metadata, metrics and checkpoint index.
+
+        Returns the artifact paths so the caller (dashboard) can remove files
+        after validating they live under its artifacts root.
+        """
+        run = self.get_run(run_id)
+        if run is None:
+            return {"deleted": False, "paths": [], "results_dir": None}
+        checkpoint_paths = [c["path"] for c in self.list_checkpoints(run_id, limit=100_000)]
+        with self.connect() as conn:
+            conn.execute("DELETE FROM metrics WHERE run_id=?", (run_id,))
+            conn.execute("DELETE FROM checkpoints WHERE run_id=?", (run_id,))
+            conn.execute("DELETE FROM runs WHERE id=?", (run_id,))
+            conn.commit()
+        return {"deleted": True, "paths": checkpoint_paths, "results_dir": run.get("results_dir")}
+
+    def delete_tournament(self, tournament_id: str) -> Dict[str, Any]:
+        """Delete a tournament, its matches and return replay/CSV artifact paths."""
+        tournament = self.get_tournament(tournament_id)
+        if tournament is None:
+            return {"deleted": False, "match_ids": [], "paths": [], "csv_path": None}
+        matches = self.list_matches(tournament_id=tournament_id, limit=100_000)
+        paths = [m["replay_path"] for m in matches if m.get("replay_path")]
+        with self.connect() as conn:
+            conn.execute("DELETE FROM matches WHERE tournament_id=?", (tournament_id,))
+            conn.execute("DELETE FROM tournaments WHERE id=?", (tournament_id,))
+            conn.commit()
+        return {
+            "deleted": True,
+            "match_ids": [m["id"] for m in matches],
+            "paths": paths,
+            "csv_path": tournament.get("csv_path"),
+        }

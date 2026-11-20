@@ -682,3 +682,66 @@ def test_persistence_and_orphan_recovery(
         assert second_client.get("/api/runs/orphan").json()["status"] == "stale"
         metrics = second_client.get("/api/runs/done/metrics").json()
         assert metrics["metrics"]["eval/win_rate"] == [[100, 0.5]]
+
+
+# ---------------------------------------------------------------------------
+# Cascade deletion
+# ---------------------------------------------------------------------------
+def test_delete_run_removes_checkpoints_replays_and_metrics(env: Dict[str, Any]) -> None:
+    client = env["client"]
+    manager = env["manager"]
+    results = Path(env["results"])
+    checkpoint = Path(env["checkpoint_path"])
+    assert checkpoint.exists()
+    replay = results / "replays" / "run-match.json"
+    replay.parent.mkdir(parents=True, exist_ok=True)
+    replay.write_text(json.dumps(_replay("run-match")), encoding="utf-8")
+    manager.add_match(
+        "run-match", f"ppo:{checkpoint}", "heuristic", winner=0, reason="top_out_b", ticks=2, seed=1,
+        replay_path=str(replay),
+    )
+    assert manager.get_metrics("ppo-1") != {}
+
+    response = client.delete("/api/runs/ppo-1")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["deleted"] is True
+    assert body["removed_matches"] == 1
+    assert client.get("/api/runs/ppo-1").status_code == 404
+    assert not checkpoint.exists()
+    assert not replay.exists()
+    assert manager.get_match("run-match") is None
+    assert manager.get_metrics("ppo-1") == {}
+    assert manager.list_checkpoints("ppo-1") == []
+    assert not (results / "runs" / "ppo-1").exists()
+
+
+def test_delete_run_does_not_touch_files_outside_results(env: Dict[str, Any], tmp_path: Path) -> None:
+    client = env["client"]
+    manager = env["manager"]
+    outside = tmp_path / "outside.pt"
+    outside.write_bytes(b"keep me")
+    manager.add_checkpoint("ppo-1", str(outside), 1234)
+    response = client.delete("/api/runs/ppo-1")
+    assert response.status_code == 200
+    assert outside.exists(), "files outside the artifacts root must never be deleted"
+
+
+def test_delete_tournament_removes_matches_and_replays(env: Dict[str, Any]) -> None:
+    client = env["client"]
+    manager = env["manager"]
+    replay = Path(env["replay"]["match_id"]).name
+    replay_path = Path(env["results"]) / "replays" / f"{replay}.json"
+    assert replay_path.exists()
+    response = client.delete("/api/tournaments/tour-1")
+    assert response.status_code == 200, response.text
+    assert response.json()["removed_matches"] == 1
+    assert client.get("/api/tournaments/tour-1").status_code == 404
+    assert not replay_path.exists()
+    assert manager.list_matches("tour-1") == []
+
+
+def test_delete_missing_run_and_tournament(env: Dict[str, Any]) -> None:
+    client = env["client"]
+    assert client.delete("/api/runs/does-not-exist").status_code == 404
+    assert client.delete("/api/tournaments/does-not-exist").status_code == 404

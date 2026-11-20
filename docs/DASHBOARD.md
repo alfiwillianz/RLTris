@@ -388,3 +388,30 @@ automation was run.
 * **Bundle size.** The production JS is ~615 kB (Recharts); no code splitting.
 * **Static build is committed.** Frontend changes require rebuilding and
   committing `static/` so the no-npm deployment path keeps working.
+
+## Deletion
+
+Runs and tournaments can be deleted from the UI (Runs table, Run detail,
+Tournaments history, Tournament detail) behind a confirmation prompt.
+
+```
+DELETE /api/runs/{id}
+DELETE /api/tournaments/{id}
+```
+
+Cascade semantics:
+
+* **Run**: stops the training process if it is running (SIGTERM, then SIGKILL),
+  deletes the run row, its metric series, its checkpoint index and checkpoint
+  files, its results directory (`results/runs/<id>` including eval JSON/logs),
+  and every match whose participant spec references the run (with its replay
+  file).
+* **Tournament**: deletes the tournament row, its match rows, every replay file
+  for those matches, and the exported CSV. A tournament whose background thread
+  is still running is refused with `409` so a worker cannot recreate rows after
+  deletion.
+
+Safety: artifact paths are resolved and must live under the configured results
+root before anything is unlinked; a checkpoint path pointing outside it is left
+untouched (covered by `tests/test_dashboard.py`). Deleting is permanent — there
+is no trash/undo.

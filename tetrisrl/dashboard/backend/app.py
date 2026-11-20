@@ -29,6 +29,8 @@ import json
 import os
 import random
 import re
+import shutil
+import signal
 import sys
 import threading
 import time
@@ -1045,6 +1047,113 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 }
             )
         return {"metric": metric, "names": sorted(all_names), "runs": series_by_run}
+
+    # -- deletion ---------------------------------------------------------
+    def _safe_artifact(path: Optional[str]) -> Optional[Path]:
+        """Return ``path`` only if it resolves under the artifacts root."""
+        if not path:
+            return None
+        try:
+            candidate = Path(path).resolve()
+            candidate.relative_to(Path(artifacts).resolve())
+        except (OSError, ValueError):
+            return None
+        return candidate
+
+    def _remove_artifact(path: Optional[str], counts: Dict[str, int]) -> None:
+        target = _safe_artifact(path)
+        if target is None or not target.exists():
+            return
+        try:
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            counts["files"] += 1
+        except OSError as exc:
+            counts.setdefault("errors", [])
+            counts["errors"].append(f"{target}: {exc}")
+
+    @app.delete("/api/runs/{run_id}")
+    def delete_run(run_id: str) -> Dict[str, Any]:
+        run = get_run_or_404(run_id)
+        stopped = False
+        if jobs.is_running(run_id) or jobs.tracked(run_id):
+            try:
+                jobs.stop(run_id, grace=3.0)
+                stopped = True
+            except Exception as exc:
+                raise HTTPException(status_code=409, detail=f"could not stop run before delete: {exc}") from exc
+        pid = run.get("pid")
+        if not stopped and pid:
+            try:
+                os.kill(int(pid), 0)
+            except (OSError, ValueError):
+                pid = None
+            if pid:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                    time.sleep(1.0)
+                    os.kill(int(pid), signal.SIGKILL)
+                    stopped = True
+                except OSError:
+                    pass
+
+        # Delete matches that reference this run.  Participants are stored as
+        # ``ppo:<checkpoint path>``, so match on the run id, its checkpoint
+        # paths and its results directory.
+        removed_matches = 0
+        counts: Dict[str, int] = {"files": 0}
+        run_checkpoints = [c["path"] for c in manager.list_checkpoints(run_id, limit=100_000)]
+        run_dir = str(run.get("results_dir") or "")
+        for match in manager.list_matches(limit=100_000):
+            haystack = f"{match.get('agent_a', '')} {match.get('agent_b', '')}"
+            referenced = run_id in haystack or (run_dir and run_dir in haystack)
+            referenced = referenced or any(str(path) in haystack for path in run_checkpoints)
+            if referenced:
+                _remove_artifact(match.get("replay_path"), counts)
+                manager.delete_match(match["id"])
+                removed_matches += 1
+
+        result = manager.delete_run(run_id)
+        for path in result.get("paths", []):
+            _remove_artifact(path, counts)
+        _remove_artifact(result.get("results_dir"), counts)
+        bus.publish({"type": "run_deleted", "run_id": run_id})
+        return {
+            "deleted": True,
+            "run_id": run_id,
+            "stopped_process": stopped,
+            "removed_matches": removed_matches,
+            "removed_files": counts["files"],
+            "errors": counts.get("errors", []),
+        }
+
+    @app.delete("/api/tournaments/{tournament_id}")
+    def delete_tournament(tournament_id: str) -> Dict[str, Any]:
+        tournament = manager.get_tournament(tournament_id)
+        if tournament is None:
+            raise HTTPException(status_code=404, detail=f"tournament {tournament_id!r} not found")
+        with tournament_lock:
+            thread = tournament_threads.get(tournament_id)
+            if thread is not None and thread.is_alive():
+                raise HTTPException(
+                    status_code=409,
+                    detail="tournament is still running; wait for it to finish before deleting",
+                )
+        result = manager.delete_tournament(tournament_id)
+        counts: Dict[str, int] = {"files": 0}
+        for path in result.get("paths", []):
+            _remove_artifact(path, counts)
+        _remove_artifact(result.get("csv_path"), counts)
+        bus.publish({"type": "tournament_deleted", "tournament_id": tournament_id})
+        return {
+            "deleted": True,
+            "tournament_id": tournament_id,
+            "removed_matches": len(result.get("match_ids", [])),
+            "removed_files": counts["files"],
+            "errors": counts.get("errors", []),
+        }
 
     # -- tournaments ------------------------------------------------------
     @app.get("/api/participants")

@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useAsync } from "../hooks";
 import { AsyncState } from "../components/Panels";
@@ -6,6 +6,7 @@ import StatusBadge from "../components/StatusBadge";
 import { formatDate, formatNumber, winnerLabel } from "../lib/format";
 
 export default function TournamentDetail() {
+  const navigate = useNavigate();
   const { tournamentId = "" } = useParams();
   const { data, error, loading, refresh } = useAsync(
     () => api.tournament(tournamentId),
@@ -41,6 +42,21 @@ export default function TournamentDetail() {
           <a className="btn" href={api.tournamentCsvUrl(tournamentId)}>
             Download CSV
           </a>
+          <button
+            className="btn btn-danger"
+            type="button"
+            onClick={async () => {
+              if (!window.confirm(`Delete tournament "${tournamentId}"? Its matches and replays are removed permanently.`)) return;
+              try {
+                await api.deleteTournament(tournamentId);
+                navigate("/tournaments");
+              } catch (err) {
+                window.alert(err instanceof Error ? err.message : String(err));
+              }
+            }}
+          >
+            Delete
+          </button>
         </div>
       </header>
 

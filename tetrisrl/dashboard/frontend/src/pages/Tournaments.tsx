@@ -212,12 +212,13 @@ export default function Tournaments() {
                   <th className="num">Participants</th>
                   <th>Winner</th>
                   <th>Created</th>
+                  <th className="num">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {data.tournaments.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="muted">
+                    <td colSpan={6} className="muted">
                       No tournaments yet.
                     </td>
                   </tr>
@@ -239,6 +240,23 @@ export default function Tournaments() {
                       <td className="num">{tournament.config.participants?.length ?? 0}</td>
                       <td>{winner ?? "—"}</td>
                       <td className="tiny">{formatDate(tournament.created_at)}</td>
+                      <td className="num">
+                        <button
+                          className="btn btn-danger btn-sm"
+                          type="button"
+                          onClick={async () => {
+                            if (!window.confirm(`Delete tournament "${tournament.name}"? Its matches and replays are removed permanently.`)) return;
+                            try {
+                              await api.deleteTournament(tournament.id);
+                              refresh();
+                            } catch (err) {
+                              window.alert(err instanceof Error ? err.message : String(err));
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}

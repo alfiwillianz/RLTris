@@ -6,5 +6,7 @@ node_modules/
 *.sqlite3
 dist/
 .pytest_cache/
-third_party/cold-clear-2/
+third_party/*
+!third_party/*.md
+!third_party/LICENSE-*
 results/

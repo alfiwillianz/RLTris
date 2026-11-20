@@ -51,6 +51,39 @@ from ...environment.engine import GameState
 
 #: Cold Clear 2 works on a fixed 10x40 board with y=0 at the *bottom*.
 TBP_WIDTH = 10
+
+@dataclass(frozen=True)
+class TBPProfile:
+    """Per-engine TBP conventions.
+
+    Cold Clear 2 (the original integration) uses ``reserve_first`` queues,
+    boolean B2B, a 40-row board and a +1 combo offset.  Other TBP engines
+    differ (RIKU/hikari use ``current_first``; some send 24/32 rows; TBP2 adds
+    ``meter`` and ``opponents``).  Keeping this as data avoids a second
+    transport implementation per engine.
+    """
+
+    name: str = "coldclear2"
+    queue_mode: str = "reserve_first"  # reserve_first | current_first
+    b2b_type: str = "bool"             # bool | int
+    combo_offset: int = 1
+    board_rows: int = 40
+    tbp_version: int = 1               # 1 | 2
+    requires_opponents: bool = False
+
+    def validate(self) -> None:
+        if self.queue_mode not in ("reserve_first", "current_first"):
+            raise ValueError(f"unknown queue_mode {self.queue_mode!r}")
+        if self.b2b_type not in ("bool", "int"):
+            raise ValueError(f"unknown b2b_type {self.b2b_type!r}")
+        if not (1 <= self.board_rows <= 40):
+            raise ValueError("board_rows must be 1..40")
+        if self.tbp_version not in (1, 2):
+            raise ValueError("tbp_version must be 1 or 2")
+
+
+DEFAULT_PROFILE = TBPProfile()
+
 TBP_HEIGHT = 40
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -108,6 +141,7 @@ def coldclear_available(binary: Optional[str | os.PathLike[str]] = None) -> bool
 def board_to_tbp_rows(
     board: Board,
     garbage_rows: Iterable[int] = (),
+    board_rows: int = TBP_HEIGHT,
 ) -> List[List[Optional[str]]]:
     """Encode a board as TBP rows (bottom row first).
 
@@ -126,7 +160,8 @@ def board_to_tbp_rows(
         )
     garbage = set(int(y) for y in garbage_rows)
     rows: List[List[Optional[str]]] = []
-    for y in range(board.height - 1, -1, -1):  # bottom-up on the wire
+    top = board.height - int(board_rows)
+    for y in range(board.height - 1, top - 1, -1):  # bottom-up on the wire
         row = board.rows[y]
         cell = "G" if y in garbage else "#"
         rows.append([cell if (row >> x) & 1 else None for x in range(board.width)])
@@ -235,6 +270,8 @@ def build_start_message(
     *,
     preview_count: Optional[int] = None,
     garbage_rows: Iterable[int] = (),
+    profile: TBPProfile = DEFAULT_PROFILE,
+    opponent_state: Optional[GameState] = None,
 ) -> Dict[str, Any]:
     """Build the TBP ``start`` message for the current state.
 
@@ -250,22 +287,40 @@ def build_start_message(
     current = state.current.name
     n = state.ruleset.board.preview if preview_count is None else int(preview_count)
     previews = state.preview(max(0, n))
-    if state.hold is not None:
+    if profile.queue_mode == "current_first":
+        queue = [current, *previews]
+    elif state.hold is not None:
         queue = [current, *previews]
     elif previews:
         queue = [previews[0], current, *previews]
     else:  # no previews configured: duplicate the current piece to stay valid
         queue = [current, current]
-    return {
+    b2b = int(state.b2b_count) if profile.b2b_type == "int" else bool(state.b2b_active)
+    message: Dict[str, Any] = {
         "type": "start",
         "hold": state.hold,
         "queue": queue,
-        # Our engine follows TETR.IO's ``-1 = no combo`` convention; TBP asks
-        # for the *count* of consecutive clears (a u32), so shift to 0-based.
-        "combo": max(0, int(state.combo) + 1),
-        "back_to_back": bool(state.b2b_active),
-        "board": board_to_tbp_rows(state.board, garbage_rows),
+        "combo": max(0, int(state.combo) + profile.combo_offset),
+        "back_to_back": b2b,
+        "board": board_to_tbp_rows(state.board, garbage_rows, profile.board_rows),
     }
+    if profile.tbp_version >= 2:
+        message["meter"] = int(state.garbage.total())
+        if opponent_state is not None:
+            message["opponents"] = [
+                {
+                    "board": board_to_tbp_rows(opponent_state.board, (), profile.board_rows),
+                    "combo": max(0, int(opponent_state.combo) + profile.combo_offset),
+                    "back_to_back": int(opponent_state.b2b_count)
+                    if profile.b2b_type == "int"
+                    else bool(opponent_state.b2b_active),
+                    "queue": [opponent_state.current.name] + opponent_state.preview(5)
+                    if opponent_state.current
+                    else [],
+                    "hold": opponent_state.hold,
+                }
+            ]
+    return message
 
 
 def parse_suggestion(message: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -297,6 +352,7 @@ class TBPSession:
         self.command = list(command)
         self.handshake_timeout = float(handshake_timeout)
         self.engine_info: Dict[str, Any] = {}
+        self._last_opponent: Optional[GameState] = None
         self._messages: "queue.Queue[Any]" = queue.Queue()
         self._stderr_lines: List[str] = []
         self._closed = False
@@ -504,7 +560,10 @@ class TBPAgent(BaseAgent):
         command: Optional[Sequence[str]] = None,
         allow_in_tests: bool = False,
         name: Optional[str] = None,
+        profile: Optional[TBPProfile] = None,
     ) -> None:
+        self.profile = profile or DEFAULT_PROFILE
+        self.profile.validate()
         self.binary = coldclear_binary_path(binary)
         self.config_path = Path(config_path).expanduser() if config_path else None
         self.think_time = max(0.0, float(think_time))
@@ -520,6 +579,7 @@ class TBPAgent(BaseAgent):
         self._session: Optional[TBPSession] = None
         self.last_suggestion: Optional[Dict[str, Any]] = None
         self.engine_info: Dict[str, Any] = {}
+        self._last_opponent: Optional[GameState] = None
 
     # -- counters -------------------------------------------------------
     @property
@@ -549,6 +609,7 @@ class TBPAgent(BaseAgent):
         self._close_session()
 
     def choose_action(self, state: GameState, opponent_state: Optional[GameState] = None) -> int:
+        self._last_opponent = opponent_state
         if state.current is None or state.finished or not state.legal_actions():
             return -1
         try:
@@ -629,7 +690,7 @@ class TBPAgent(BaseAgent):
     def _request_suggestion(self, state: GameState) -> List[Dict[str, Any]]:
         session = self._ensure_session()
         session.drain()  # drop any late reply from a previous timeout
-        session.send(build_start_message(state))
+        session.send(build_start_message(state, profile=self.profile, opponent_state=self._last_opponent))
         started = time.monotonic()
         budget = self.timeout
         sleep_for = min(self.think_time, budget * 0.5)

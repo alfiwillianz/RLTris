@@ -185,7 +185,8 @@ time (weak signal).
   The README states it is a Rust reimplementation of SoRA_X7's Hikari, ported from
   GitLab commit `90aef085a53d6048cbd19de7f4c9c53a6f3c8960`; the port author is the
   original author, which is what makes MIT plausible here. The GitLab original's license
-  was **not** fetched, so this rests on the port's own `LICENSE`. [VERIFIED]
+  was **not verified** (its page is JS-rendered and no license text was retrievable), so
+  this rests on the port's own `LICENSE`. [VERIFIED]
 * **Language:** Rust (edition 2024, which requires Rust ≥ 1.85).
   Dependencies: `clap`, `rayon`, `serde`, `serde_json`, pinned by `Cargo.lock`. No GPU.
 * **Build/runtime:** `cargo build --release` (first build needs crates.io; subsequent
@@ -198,13 +199,13 @@ time (weak signal).
   classification, Mirai-style placement generation including spins/tucks, integer
   evaluation, layer-shared parallel search with backpropagation. Own versus rules: 24
   rows, 3-frame spawn, 38-frame line clear, garbage arrival after 60 frames, attack
-  cancel, up to 8 garbage rows per landing; a `tools/versus.py` harness exists and CI
-  plays PRs against `main` (40 games, seeded). **No 180°.** [VERIFIED source/README]
+  cancel, up to 8 rows rising on a non-clearing landing; a `tools/versus.py` harness
+  exists and CI plays PRs against `main` (40 games, seeded). **No 180°.** [VERIFIED source/README]
 * **Garbage planning:** Only indirectly — the host sends `reset`/`start` with the risen
   board. No pending-garbage field in its TBP dialect.
 * **Activity/adoption:** 0★, **created 2026-11-20** — hours old at verification — pushed the
-  same day; ported from a mature engine, with tests, benches and CI workflows. No external
-  users yet, so the *port* is unproven even though the algorithm is not.
+  same day; ported from a mature engine, with tests, evaluation tooling and CI workflows.
+  It has no external users yet, so the *port* is unproven even though the algorithm is not.
 * **Integration path:** point a per-engine TBP configuration at the binary. Required
   deltas: current-piece queue convention (`queue[0] = current`), `b2b` boolean, board
   bottom-first 40 rows with rows 24–39 empty (or truncate to 24 rows; truncation is
@@ -231,7 +232,8 @@ time (weak signal).
   `git clone --recurse-submodules … && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release &&
   cmake --build build -j`; the TBP backend is `nana_tbp` (launcher in
   `build/cpp/nana_tbp` under a Unix single-config generator). A `nana.json` beside the
-  executable sets `{"rules":"tetrio","threads":3,"pin_layout":"compact"}`.
+  executable configures it; the upstream example is
+  `{"rules":"tetrio","threads":3,"pin_layout":"compact"}`.
 * **Protocol/interface:** **TBP2** (`cpp/tbp.cpp`, compiled with `TBP`+`TBP2`). It
   **requires `opponents[0]`** in `start` and reads `opponents` again in `play`; it also
   reads `meter`, `garbage_delay`, `back_to_back` (bool or int), `combo`, `queue`,
@@ -347,10 +349,9 @@ time (weak signal).
   `Cell::G` for garbage cells. No `opponents`/`meter`.
 * **Mechanics:** own versus bot with board/movegen/search/transposition table/eval/plan
   and a tuner; `b2b`, `ren`, T-spin detection; **no garbage or opponent modelling** found
-  in `bot/state.*`, `bot/board.*`, `bot/thread.*`. Its `ppt/` target is the Puyo Puyo
-  Tetris client, i.e. it was built to *play* versus, not to model incoming garbage.
-  [VERIFIED by source inspection]
-* **Activity/adoption:** 3★, created 2022-03-18, last push 2022-05-23, dormant; no releases.
+  in `bot/state.*`, `bot/board.*`, `bot/thread.*`. Its `ppt/` target links a Puyo Puyo
+  Tetris sync library (a client, not a versus model). [VERIFIED by source inspection]
+* **Activity/adoption:** 3★, created 2022-03-18, last push 2022-05-23, dormant.
 * **Verdict: ACCEPT-WITH-ADAPTATION (experimental).** A self-contained TBP search bot
   with MIT and no deps; integration cost is a Linux build line + queue-convention check.
   It is dormant and unproven, so use only as a *secondary* TBP opponent.
@@ -362,8 +363,8 @@ time (weak signal).
 * **Pinned HEAD:** `74852b4d9dbc279728882735dfe1a2140738d904` (2026-11-16)
 * **License:** **MIT**, "Copyright (c) 2026 osmii". [VERIFIED]
 * **Language:** Rust 2024 workspace (`crates/{bot,sim,selfplay,cli}`, `web/engine`).
-  Dependencies: `serde`, `serde_json`, `smallvec`, `rayon` (+ criterion for benches).
-  No GPU.
+  Workspace dependencies: `serde`, `serde_json`, `smallvec`, `rayon` (+ `criterion` for
+  benches). No GPU.
 * **Protocol/interface:** **None.** CLI subcommands (`replay`, `diff`, `gen`, `perft`,
   `bot-vs-bot`, `weights`, `tune`, `tournament`, `nnue-eval`); `replay <request.json>`
   consumes a JSON request and emits a trace. There is no stdin bot loop, so integration
@@ -374,7 +375,7 @@ time (weak signal).
   `nnue` and hand weights, `weights.json`, `selfplay`/tuning. So it is a **versus-aware
   search + NNUE/hand-eval engine with its own simulator**, not a TBP bot.
   Whether the search conditions on pending garbage is **[UNVERIFIED]**.
-* **Activity/adoption:** 1★, pushed 2026-11-16; active, no users.
+* **Activity/adoption:** 1★, pushed 2026-11-16; active, negligible adoption.
 * **Verdict: ACCEPT-WITH-ADAPTATION (experimental, higher effort).** Interesting because
   it is a learned-evaluation engine (NNUE) with a versus simulator, which is a genuinely
   different evaluation family from CC/attax-style handcrafted search. But it needs a
@@ -394,7 +395,8 @@ time (weak signal).
   language) or via its FastAPI `/ws` play channel.
 * **Mechanics:** README claims **TETR.IO S2 versus** rules (board, kicks, spins, garbage
   queue, attack math) + heuristic **DAG search** "inspired by Cold Clear" + GA reward
-  tuning. Single-day repo, one commit, no tests or external users. [VERIFIED README]
+  tuning. Single-day repo, one commit, no external users; no test suite is listed in the
+  root layout. [VERIFIED README]
 * **Garbage planning:** the engine models garbage; whether the AI search conditions on
   pending garbage is **[UNVERIFIED]**.
 * **Verdict: ACCEPT-WITH-ADAPTATION (experimental reference).** The only permissively
@@ -406,12 +408,15 @@ time (weak signal).
 
 ### 4.8 Re-verified existing candidates (details in `docs/BENCHMARKS.md`)
 
+Every `owner/repo` identifier in the two tables below is a repository at
+`https://github.com/owner/repo`.
+
 | Candidate | What was re-checked | Verdict |
 |---|---|---|
 | `MinusKelvin/cold-clear` (v1) | workspace still contains `c-api` and `tbp` crates; 278★; **archived**, pushed 2022-01-29; MPL-2.0 | **ACCEPT-WITH-ADAPTATION** — still the best-documented *garbage-count-aware* engine (`cc_request_next_move(bot, incoming)`), but MPL-2.0 and dead. Keep as a second CC-family opponent if the C-API shim is built. |
 | `MinusKelvin/cold-clear-2` | 71★, pushed 2022-06-29, `license = "MIT OR Apache-2.0"`, TBP1 | **INTEGRATED** (20 real matches). No garbage planning, no 180. |
 | `souta-lab/attax` | 2★, AGPL-3.0, pushed 2026-11-20; `tbp/` now only `SMOKE.md` + `intetrigence-match.md`; README §TBP confirms adapter removed; GPU/Vulkan-only | **REJECT** — AGPL + GPU-only + no protocol. Cite its numbers, don't depend on it. |
-| `seipass/intetrigence` | 0★, AGPL-3.0, pushed 2026-11-17 | **REJECT as dependency** — AGPL-3.0-only, unvetted, self-reported 1–50 vs Attax. Useful S2 doc cross-check only. |
+| `seipass/intetrigence` | 0★, AGPL-3.0, pushed 2026-11-17 | **REJECT as dependency** — AGPL-3.0-only, unvetted (the prior survey reported 1–50 vs Attax). Useful S2 doc cross-check only. |
 | `misakamm/MisaMino` | `LICENSE` exactly 21 bytes `Copyleft by Misakamm`; 116★; last commit 2015-07-15; Windows DLL C ABI | **REJECT** — non-OSI license blocks any redistribution/derivative; dead + Windows-only. |
 | `ZetrisAI/Zetris` | 84★, BSD-3-Clause, pushed 2025-08-22; MisaMino-based, screen-capture + virtual gamepad | **REJECT** — not a library; BSD cannot cover the MisaMino engine. |
 | `blockfish/blockfish` | 46★, LGPL-2.1, pushed 2025-07-13; cheese-race specialist | **REJECT for versus** — cannot play versus and cannot plan around attack; keep as an optional downstacking diagnostic, never as a general opponent. |
@@ -425,8 +430,8 @@ time (weak signal).
 | `TheMining72/MisaMinoJS` | Node native addon, **no license**, 2021; engine license problem. |
 | `analog-hors/MisaMinoCLI` | C# MPL-2.0 CLI wrapper for MisaMino; wrapper license does not cure the engine. |
 | `knewjade/misamino-survey` | Claims MIT over MisaMino survey code; that relicense is not the author's to make. Ignore. |
-| `SoRA-X7/Quadspace` | 6★, MIT, **archived** TBP frontend/playground; a host, ships no AI. |
-| `imcatag/project-tetr` | MIT Unity TBP host; README: "The game has absolutely no authority… will accept move 0 every time"; no AI, no releases. |
+| `SoRA-X7/Quadspace` | 6★, MIT, **archived** TBP frontend/playground; a host, no AI advertised. |
+| `imcatag/project-tetr` | MIT Unity TBP host; README: "The game has absolutely no authority… will accept move 0 every time"; hosts external bots, ships no AI. |
 | `shakkar23/Universal-Shaktris-Stadium` | GPL-3.0 C TBP2 frontend/arena; valuable **spec** source, unusable as a dependency. |
 | `ruelalarcon/minorail` | MIT Python SBP runner/arena; no built-in AI (`bots/` is process management). Useful for testing SBP bots, not an opponent. |
 | `tetris-bot-protocol/tbp-rs` | MIT OR Apache-2.0 Rust TBP **types** crate; useful reference for the adapter, not an engine. |
@@ -466,6 +471,18 @@ Legend: ✅ documented/implemented · ⚠️ partial/claim · ❌ no · `?` unve
 | intetrigence | AGPL-3.0 | Rust | TBP host/own | ✅ | ✅ claim | ✅ claim | ✅ claim | ? | ✅ | 2026-11-17 |
 | MisaMino | non-OSI | C++ | Win DLL | ⚠️ own | ❌ | ⚠️ | ✅ own | ? | ✅ TOJ-style | 2015-07-15 |
 | Blockfish | LGPL-2.1 | Rust | protobuf | ✅ | ❌ | ❌ | ❌ | ❌ | cheese only | 2025-07-13 |
+
+### 5.1 Flags at a glance
+
+| Flag | Projects |
+|---|---|
+| **Blocking license problem** (non-OSI / no license / unlicensed spec) | MisaMino and all its wrappers, `nyctivoe/tetris-engine-in-rust`, `akameki/akirobo`, `sami-29/tetris-lab`, `GregoryCannon/StackRabbit`, `tetris-bot-protocol/{dellacherie,battletris}`, tbp-spec and the Stacker Bot Protocol spec |
+| **AGPL / strong copyleft** | `souta-lab/attax` (AGPL-3.0), `seipass/intetrigence` (AGPL-3.0-only), `shakkar23/Universal-Shaktris-Stadium` (GPL-3.0), `traias/TetrasC` (GPL-2.0) |
+| **Windows-only / GUI / binary blob** | MisaMino (MSVC + `.lib` blobs), Zetris, ZetrisV2, MisaMinoNET, TetrasC (DxLib), `lemon-tea-2`'s Makefile (Linux build plausible but untested) |
+| **Dead / archived / dormant** | Cold Clear 1 (archived 2022), MisaMino (2015), Quadspace (archived 2021), `lemon-tea-2` (2022), `PeterPalotas/Tetris-Bot` (last push 2025-12) |
+| **Cannot plan around pending garbage** | Cold Clear 2, `hikari_rei`, `RIKU0804`, `lemon-tea-2`, `frostetra` (field parsed, unused), Blockfish; `attax` and `intetrigence` claim it but are unusable here |
+| **Placement suggester only (not a simulator)** | every engine in this document; the arena stays authoritative |
+| **Host/frontend, ships no AI** | Quadspace, project-tetr, Universal Shaktris Stadium, Minorail, AlphaStack, battletris |
 
 ---
 
@@ -618,6 +635,10 @@ git -C third_party/hikari_rei checkout 21b63c652f232d64016b2af72876d7a4b0e238fd
 # run: third_party/hikari_rei/target/release/hikari_rei tbp --threads 1
 ```
 
+Because the port is hours old, treat it as a fast-moving dependency: pin the commit and
+re-run the smoke tests after any update. If that churn is unacceptable, RIKU0804 (§4.4)
+is the lower-churn TBP alternative.
+
 **Adapter protocol:** TBP1, with three deltas from the CC2 configuration:
 `queue[0] = current` (no reserve slot), `back_to_back` must be a **JSON boolean**, and the
 board must be bottom-first with **rows 24–39 empty** (or send only the bottom 24 rows; a
@@ -739,7 +760,7 @@ Raw files (representative; brace lists denote multiple literal URLs):
 `…/citrus610/lemon-tea-2/HEAD/{LICENSE,README.md,Makefile,tbp/main.cpp,tbp/tbp.h,bot/*.h,bot/*.cpp}`,
 `…/cosmiolotl/otto/HEAD/{LICENSE,README.md,Cargo.toml,crates/cli/src/main.rs,crates/bot/src/spec.rs}`,
 `…/blchiu616/modern-versus-tetris-ai/HEAD/{LICENSE,README.md}`,
-`…/souta-lab/attax/HEAD/{README.md,LICENSE}`,
+`…/souta-lab/attax/HEAD/README.md`,
 `…/misakamm/MisaMino/HEAD/LICENSE`,
 `…/tetris-bot-protocol/{tbp-rs,dellacherie,battletris}/HEAD/Cargo.toml`.
 
@@ -754,13 +775,14 @@ otto, modern-versus-tetris-ai, attax, intetrigence, nyctivoe, MisaMino.
    integrate an engine must execute the smoke tests in §8 before citing any number.
 2. **`hikari_rei` combo convention** — `combo` maps to `ren` directly; whether our
    `combo+1` is correct is unverified.
-3. **`nana` TBP2 acceptance of repeated `start` without `play`** — source suggests yes
-   (it rebuilds an emulation game per `start`), but it has not been exercised.
+3. **Repeated `start` without `play`** — `nana` rebuilds an emulation game per `start`
+   and `hikari_rei` parses a new position per `start`; both look compatible with our
+   start-per-piece adapter, but neither has been exercised.
 4. **`frostetra` SRS+ kick tables and 180 coverage** — README claim only.
 5. **`otto` and `modern-versus` API stability and garbage awareness** — trees/READMEs
    only.
 6. **Any TETR.IO Season 2 attack engine** — none found that is permissively licensed and
    verified. The arena remains the ruleset authority.
-7. **Star counts / created dates for a few rejects** — `hikari_rei` (created 2026-11-20)
-   and `lemon-tea-2` (created 2022-03-18) are now complete; a handful of one-line rejects
-   have only a name, description and license, marked `[PARTIAL]` where relevant.
+7. **Metadata completeness** — last-push dates, licenses and stars are first-hand for
+   every dossier; a handful of one-line rejects have only a name, description and license
+   and are marked `[PARTIAL]` where a field is missing.
